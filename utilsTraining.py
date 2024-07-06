@@ -1,7 +1,7 @@
 import os
 import torch
 import torch.nn.functional as F
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score,roc_curve
 from models.teacher import teacherTimm
 from models.StudentTeacher.student  import studentTimm
 from datasets.mvtec import MVTecDataset
@@ -9,14 +9,22 @@ from models.EfficientAD.efficientAD import loadPdnTeacher
 from models.EfficientAD.common import get_pdn_medium,get_pdn_small
 from models.ReverseDistillation.rd import loadBottleNeckRD, loadStudentRD
 from models.DBFAD.reverseResidual import reverse_student18
+import sys
+from PIL import Image
+import numpy as np
+from torch.utils.tensorboard import SummaryWriter
+writer=SummaryWriter("runs")
+
+
 
 def getParams(trainer,data,device):
     trainer.device = device
     trainer.validation_ratio = 0.2
     trainer.data_path = data['data_path']
     trainer.obj = data['obj']
-    trainer.img_resize = data['TrainingData']['img_size']
-    trainer.img_cropsize = data['TrainingData']['crop_size']
+    trainer.img_resize_h = data['TrainingData']['img_size_h']
+    trainer.img_resize_w = data['TrainingData']['img_size_w']
+    trainer.img_cropsize = data['TrainingData']['crop_size'] #for centercrop mvtec
     trainer.num_epochs = data['TrainingData']['epochs']
     trainer.lr = data['TrainingData']['lr']
     trainer.batch_size = data['TrainingData']['batch_size']   
@@ -27,7 +35,13 @@ def getParams(trainer,data,device):
     trainer.outIndices = data['out_indice']
     trainer.distillType=data['distillType']
     trainer.norm = data['TrainingData']['norm']
-    
+    trainer.threshold=data['threshold']
+    trainer.param_str=str(data['obj'])+"_"+str(data['TrainingData']['epochs'])+"_"+str(data['TrainingData']['batch_size'])+"_"+str(data['TrainingData']['lr'])
+    trainer.cropping=data['cropping'] #my own cropping for hd image downsizing
+    trainer.croppingfactor=data['croppingfactor']
+    trainer.test_img_resize_h = data['TestData']['img_size_h']
+    trainer.test_img_resize_w = data['TestData']['img_size_w']
+    trainer.test_img_cropsize = data['TestData']['crop_size']
     
 def loadWeights(model,model_dir,alias):
     try:
@@ -88,7 +102,7 @@ def loadModels(trainer):
 def loadDataset(trainer):
     kwargs = ({"num_workers": 8, "pin_memory": True} if torch.cuda.is_available() else {})
     train_dataset = MVTecDataset(root_dir=trainer.data_path+"/"+trainer.obj+"/train/good",
-        resize_shape=[trainer.img_resize,trainer.img_resize],
+        resize_shape=[trainer.img_resize_h,trainer.img_resize_w],
         crop_size=[trainer.img_cropsize,trainer.img_cropsize],
         phase='train'
     )
@@ -98,11 +112,16 @@ def loadDataset(trainer):
     train_data, val_data = torch.utils.data.random_split(
         train_dataset, [train_num, valid_num]
     )
-    trainer.train_loader=torch.utils.data.DataLoader(train_data, batch_size=trainer.batch_size, shuffle=True, **kwargs)
-    trainer.val_loader=torch.utils.data.DataLoader(val_data, batch_size=8, shuffle=False, **kwargs)
+
+    writer.add_image("test",train_dataset.__getitem__(0).get("imageBase"))
+                                                                  #kwargs=num_workers etc dependent on gpu available or not
+    trainer.train_loader=torch.utils.data.DataLoader(train_data, batch_size=trainer.batch_size, shuffle=True, **kwargs) 
     
+    trainer.val_loader=torch.utils.data.DataLoader(val_data, batch_size=8, shuffle=False, **kwargs)
+    #return train_data,val_data
     
 def infer(trainer, img):
+ 
     if (trainer.distillType=="st" ):
         features_t = trainer.teacher(img)
         features_s=trainer.student(img)
@@ -149,3 +168,11 @@ def cal_importance(ft, fs,norm):
     fs_norm = fs_norm[sortedIndex]
     
     return ft_norm,fs_norm
+
+def computeROCcurve(y_true,y_score):
+    '''
+    return:
+    fpr, tpr, thresholds
+    '''
+    fpr, tpr, thresholds=roc_curve(np.array(y_true),np.array(y_score))
+    return fpr, tpr, thresholds

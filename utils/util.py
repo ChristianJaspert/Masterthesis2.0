@@ -63,3 +63,7 @@ def denormalization(x):
     x = (((x.transpose(1, 2, 0) * std) + mean) * 255.0).astype(np.uint8) # was transpose
 
     return x
+
+# with open("/home/christianjaspert/masterthesis/distillation/DistillationAD/config.yaml") as f:
+#     data=yaml.safe_load(f)
+#     print(data)

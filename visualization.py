@@ -1,4 +1,5 @@
 import os
+import sys
 import torch
 import math
 from tqdm import tqdm
@@ -69,7 +70,7 @@ def generateFeaturesImage(directory,input_features, compteur,type,featuresToShow
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    data=readYamlConfig("config.yaml")
+    data=readYamlConfig("/home/christianjaspert/masterthesis/distillation/DistillationAD/config.yaml")
     trainer = NetTrainer(data,device)
     trainer.student=loadWeights(trainer.student,trainer.model_dir,"student.pth")
     visualize(trainer,layer=0,importanceSort=True)

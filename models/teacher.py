@@ -20,7 +20,6 @@ class teacherTimm(nn.Module):
             param.requires_grad = False   
         
     def forward(self, x):
-        
         features_t = self.feature_extractor(x)
     
         return features_t

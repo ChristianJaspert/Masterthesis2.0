@@ -65,7 +65,7 @@ class ReverseStudent(nn.Module):
                 Attention(256, 256)
             )
 
-
+        #print("lb",layers,block)
         self.layer0 = self._make_layer(block, 256, layers[0], stride=2)
         self.layer1 = self._make_layer(block, 128, layers[0], stride=2)
         self.layer2 = self._make_layer(block, 64, layers[1], stride=2)
@@ -93,7 +93,7 @@ class ReverseStudent(nn.Module):
                 deconv2x2(self.inplanes, planes * block.expansion, stride),
                 norm_layer(planes * block.expansion),
             )
-
+        #print(planes*block.expansion)
         layers = []
         layers.append(block(self.inplanes, planes, stride, upsample, self.groups,
                             self.base_width, previous_dilation, norm_layer))
@@ -106,6 +106,7 @@ class ReverseStudent(nn.Module):
         return nn.Sequential(*layers)
 
     def _forward_impl(self, x):
+        #print("x",x[0].shape)
         out1 = self.block1(x[0])
         out2 = self.block2(x[1])
         out3 = self.block3(x[2])
@@ -113,13 +114,21 @@ class ReverseStudent(nn.Module):
         out = (out1 + out2 + out3 + out4)
         out = self.block5(out)
         out = self.AttBlock(out)
-
+        
+        
         if not self.DG:
             resi1 = self.residualLayer0_1(x[0])
             resi2 = self.residualLayer1_2(x[1])
             resi3 = self.residualLayer2_3(x[2])
 
         feature_x = self.layer0(out)
+        #print(x[2],"x[2]")
+        #print(self.residualLayer2_3(x[2]).shape,"residualLayer")
+        #print(resi3.shape,"resi3")
+        #print(out.shape,"out")
+        
+        #print(feature_x.shape,"feature_X=layer0(out)")
+        #print(self.layer0)
         feature_x = feature_x + resi3 if not self.DG else feature_x
         feature_a = self.layer1(feature_x)  
         feature_a = feature_a+resi2 if not self.DG else feature_a

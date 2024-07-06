@@ -1,14 +1,26 @@
-data_path: "../../datasets/MVTEC"
-distillType: st # rd,ead, st
+data_path: "/home/christianjaspert/masterthesis/DistillationAD/datasets/MVTEC"
+distillType: dbfad #st #st #dbfad # rd,ead, st
 backbone: resnet18 # any cnn model for, any resnet or wide resnet for rd, medium or small for ead
 out_indice: [2,3] # for st
-obj: wood
+#obj: fabric_cropped_png_like_mvtec_NOT_cropped_test # w625 h337 test: w2500 h1350#
+obj: fabric_cropped_png_like_mvtec #w625 h337
+#obj: carpet #carpet
+#obj: fabric2cropped_png #w1250 h675
 phase: train
 save_path: "./results"
+#cropping: True
+cropping: FALSE
+croppingfactor: 4
+threshold: 0.00001
 TrainingData:
-  epochs: 50
-  batch_size: 8
-  lr: 0.0004
-  img_size: 224
-  crop_size: 224
+  epochs: 2 #100
+  batch_size: 4 #4
+  lr: 0.0005 #0.0005
+  img_size_h: 256 #337 #224 #337 #1350
+  img_size_w: 256 # #625 #2500
+  crop_size: 256 #337
   norm: True # normalize features before loss calculation
+TestData:
+  img_size_h: 256
+  img_size_w: 256
+  crop_size: 256
