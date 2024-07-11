@@ -25,7 +25,40 @@ from utils.functions import (
 from utilsTraining import getParams,loadWeights,loadModels,loadDataset,infer,computeAUROC,computeROCcurve
 from torch.utils.tensorboard import SummaryWriter
 writer=SummaryWriter("runs")
+torch.set_default_dtype(torch.float64)
 
+
+
+
+####################################################
+#DONT DELETE!!!!!!!!!!!!!!
+#the commented code below is to show in wich file a print was used!
+####################################################
+
+# import sys
+# import inspect
+# import collections
+# _stdout = sys.stdout
+
+# Record = collections.namedtuple(
+#     'Record',
+#     'frame filename line_number function_name lines index')
+# class MyStream(object):
+#     def __init__(self, target):
+#         self.target = target
+#     def write(self, text):
+#         if text.strip():
+#             record = Record(*inspect.getouterframes(inspect.currentframe())[1])        
+#             self.target.write(
+#                 '{f} {n}: '.format(f = record.filename, n = record.line_number))
+#         self.target.write(text)
+
+# sys.stdout = MyStream(sys.stdout)
+
+# def foo():
+#     print('Hi')
+
+# foo()
 
 
 class NetTrainer:          
@@ -96,6 +129,7 @@ class NetTrainer:
             losslist.append([loss_epoch.item(),val_loss])
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
+            print("test")
         epoch_bar.close()
         print("Training end.")
         return losslist      
@@ -140,30 +174,16 @@ class NetTrainer:
         
         
         kwargs = ({"num_workers": 1, "pin_memory": True} if torch.cuda.is_available() else {} )
-        if self.cropping:
-
-            test_dataset = MVTecDataset(
-                root_dir=self.data_path+"/"+self.obj+"/test/",
-                resize_shape=[self.test_img_resize_h,self.test_img_resize_w],
-                crop_size=[self.test_img_cropsize,self.test_img_cropsize],
-                phase='test',
-                cropping=True,
-                croppingfactor=self.croppingfactor
-
-            )
-            #print(self.data_path+"/"+self.obj+"/test/")
-        else:
-            test_dataset = MVTecDataset(
-                root_dir=self.data_path+"/"+self.obj+"/test/",
-                resize_shape=[self.img_resize_h,self.img_resize_w],
-                crop_size=[self.img_cropsize,self.img_cropsize],
-                phase='test',
-                cropping=False,
-                croppingfactor=1
-            )
-        print(test_dataset)
+        
+        test_dataset = MVTecDataset(
+            root_dir=self.data_path+"/"+self.obj+"/test/",
+            resize_shape=[self.img_resize_h,self.img_resize_w],
+            crop_size=[self.img_cropsize,self.img_cropsize],
+            phase='test'
+        )
+        
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, **kwargs)
-        print(test_loader)
+        
         
         
         scores = []
@@ -188,28 +208,11 @@ class NetTrainer:
             concat_prediction=0
             
             with torch.set_grad_enabled(False):
-                if self.cropping:
-                    print("cropping")
-                    cropped_imgs=crop_torch_img(image,self.croppingfactor)
-                    cropped_scores=[]
-                    
-                    for image_cr in cropped_imgs:
-                        #print(image_cr)
-                        
             
-                        
-                        features_s, features_t = infer(self,image_cr) 
-                        
-                        score_cr =cal_anomaly_maps(features_s,features_t,[image_cr.shape[2],image_cr.shape[3]],trainer.norm) #numpy.ndarray ()
-                        cropped_scores.append(score_cr)
-                    score=concat_hm(cropped_scores=cropped_scores,croppingfactor=self.croppingfactor)
-                    #print(score.shape)
-                    
-                else:
-                    print("not cropping")
-                    features_s, features_t = infer(self,image)  
-                    score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm) 
-                    
+                print("not cropping")
+                features_s, features_t = infer(self,image)  
+                score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm) 
+                
                 f, axarr = plt.subplots(1,3)
                 im_fab=axarr[0].imshow(img_transposetorch2nparr(image.cpu().numpy()))#.astype('uint8'))
                 #numpy image: (height,width,rgb)

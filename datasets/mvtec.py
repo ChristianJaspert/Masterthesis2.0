@@ -9,7 +9,7 @@ import sys
 
 class MVTecDataset(Dataset):
 
-    def __init__(self, root_dir, resize_shape=None,crop_size=None,phase="train",cropping=False,croppingfactor=4):
+    def __init__(self, root_dir, resize_shape=None,crop_size=None,phase="train"):
         self.root_dir = root_dir
         
         image_extensions = ['png', 'tif', 'tiff', 'jpg', 'jpeg']
@@ -19,8 +19,7 @@ class MVTecDataset(Dataset):
 
         self.image_paths = sorted(glob.glob(root_dir+"/*.png"))
 
-        self.cropping=cropping
-        self.croppingfactor=croppingfactor
+        
 
         self.resize_shape=resize_shape
         if (crop_size==None):
@@ -37,55 +36,20 @@ class MVTecDataset(Dataset):
 
     def transform_image(self, image_path):
         
-        croppingfactor=self.croppingfactor
+        
         image = cv2.imread(image_path, cv2.IMREAD_COLOR) #shape(h,w,rgb)
-        print(self.cropping)
-        if self.cropping:
-            print("mvtec cropping")
-            height,width = image.shape[0],image.shape[1] 
-            w_rest=width%croppingfactor
-            h_rest=height%croppingfactor
-            img_rest = image[h_rest:height,w_rest:width,:]
-            height,width=img_rest.shape[0],img_rest.shape[1] 
-            list_cropped_images=[]
-            for w in range(croppingfactor):
-                for h in range(croppingfactor):
-                    img_cropped=img_rest[int(h*(height/croppingfactor)):int((h+1)*height/croppingfactor),int(w*width/croppingfactor):int((w+1)*width/croppingfactor),:]
-                    #img_cropped=img_rest.crop((w*(width/factor),h*height/factor,(w+1)*width/factor,(h+1)*height/factor))
-                    list_cropped_images.append(img_cropped)
-            for i in range(len(list_cropped_images)):
-                image=list_cropped_images[i]
-                if self.resize_shape != None:
-                    image = cv2.resize(image, dsize=(self.resize_shape[1], self.resize_shape[0]))
+     
+        
+        if self.resize_shape != None:
+            # cv2.resize(dsize(width,height))
+            #resize_shape=(height,width)
+            image = cv2.resize(image, dsize=(self.resize_shape[1], self.resize_shape[0]))
             
-                image = np.array(image).reshape((image.shape[0], image.shape[1], 3)).astype(np.float32)/ 255.0
-                
-                image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                image = np.transpose(image, (2, 0, 1))
-                list_cropped_images[i]=np.asarray(self.transform(torch.from_numpy(image)))
-
-            _,heigth,width=list_cropped_images[0].shape
-            image=np.zeros((3,heigth*croppingfactor,width*croppingfactor))
-            i=0
-            for w in range(croppingfactor):
-                for h in range(croppingfactor):
-                    image[:,h*heigth:(h+1)*heigth,w*width:(w+1)*width]=list_cropped_images[i]
-                    i+=1
-            
-            
-
-        else:
-            print("mvtec not cropping")
-            if self.resize_shape != None:
-                # cv2.resize(dsize(width,height))
-                #resize_shape=(height,width)
-                image = cv2.resize(image, dsize=(self.resize_shape[1], self.resize_shape[0]))
-                
-            image = np.array(image).reshape((image.shape[0], image.shape[1], 3)).astype(np.float32)/ 255.0
-            
-            image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            image = np.transpose(image, (2, 0, 1))
-            image=np.asarray(self.transform(torch.from_numpy(image)))
+        image = np.array(image).reshape((image.shape[0], image.shape[1], 3)).astype(np.float32)/ 255.0
+        
+        image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = np.transpose(image, (2, 0, 1))
+        image=np.asarray(self.transform(torch.from_numpy(image)))
         #print("mvtec image",image.dtype)
         if self.phase=="test":
             return image   
@@ -101,8 +65,8 @@ class MVTecDataset(Dataset):
             img_path = self.images[idx]
             dir_path, file_name = os.path.split(img_path)
             base_dir = os.path.basename(dir_path)
-            image = self.transform_image(img_path).astype("double")
-            print("image dtype",image.dtype)
+            image = self.transform_image(img_path)
+            #print("image dtype",image.dtype)
             if base_dir == 'good':
                 has_anomaly = np.array([0], dtype=np.int64)
             else:

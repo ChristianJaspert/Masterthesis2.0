@@ -44,17 +44,20 @@ def getParams(trainer,data,device):
     trainer.test_img_cropsize = data['TestData']['crop_size']
     
 def loadWeights(model,model_dir,alias):
+    #print("loadWeights")
     try:
         checkpoint = torch.load(os.path.join(model_dir, alias))
     except:
         raise Exception("Check saved model path.")
     model.load_state_dict(checkpoint["model"])
-    model.eval() 
+    model.eval()
+    #print("load weights",model.parameters()) 
     for param in model.parameters():
         param.requires_grad = False
     return model
 
 def loadTeacher(trainer):
+    #print("loadTeacher")
     if (trainer.distillType=="st"):
         trainer.teacher=teacherTimm(backbone_name=trainer.modelName,out_indices=trainer.outIndices).to(trainer.device)
     elif (trainer.distillType=="ead"):
@@ -79,6 +82,7 @@ def loadTeacher(trainer):
         param.requires_grad = False
 
 def loadModels(trainer):
+    #print("loadModels")
     if (trainer.distillType=="st"):
         loadTeacher(trainer)
         trainer.student=studentTimm(backbone_name=trainer.modelName,out_indices=trainer.outIndices).to(trainer.device)
@@ -100,6 +104,7 @@ def loadModels(trainer):
         trainer.student2=studentTimm(backbone_name=trainer.modelName[1],out_indices=trainer.outIndices[1]).to(trainer.device)
     
 def loadDataset(trainer):
+    #print("loadDataset")
     kwargs = ({"num_workers": 8, "pin_memory": True} if torch.cuda.is_available() else {})
     train_dataset = MVTecDataset(root_dir=trainer.data_path+"/"+trainer.obj+"/train/good",
         resize_shape=[trainer.img_resize_h,trainer.img_resize_w],
@@ -121,6 +126,9 @@ def loadDataset(trainer):
     #return train_data,val_data
     
 def infer(trainer, img):
+    #print("infer")
+    #img.type(torch.float64)
+    trainer.val_loader
  
     if (trainer.distillType=="st" ):
         features_t = trainer.teacher(img)

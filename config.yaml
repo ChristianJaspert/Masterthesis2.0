@@ -6,14 +6,14 @@ out_indice: [2,3] # for st
 obj: fabric_cropped_png_like_mvtec #w625 h337
 #obj: carpet #carpet
 #obj: fabric2cropped_png #w1250 h675
-phase: train
+phase: test
 save_path: "./results"
 #cropping: True
-cropping: FALSE
+cropping: False
 croppingfactor: 4
 threshold: 0.00001
 TrainingData:
-  epochs: 2 #100
+  epochs: 50 #100
   batch_size: 4 #4
   lr: 0.0005 #0.0005
   img_size_h: 256 #337 #224 #337 #1350

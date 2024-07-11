@@ -1,4 +1,5 @@
 import timm
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -17,6 +18,8 @@ class teacherTimm(nn.Module):
         )
         self.feature_extractor.eval() 
         for param in self.feature_extractor.parameters():
+            #param=param.type(torch.float64)
+            #print("models/teacher.py",param.dtype)
             param.requires_grad = False   
         
     def forward(self, x):
