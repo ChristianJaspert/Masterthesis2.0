@@ -1,5 +1,4 @@
 import os
-import time
 from datetime import datetime
 import sys
 from PIL import Image
@@ -179,9 +178,13 @@ class NetTrainer:
             root_dir=self.data_path+"/"+self.obj+"/test/",
             resize_shape=[self.img_resize_h,self.img_resize_w],
             crop_size=[self.img_cropsize,self.img_cropsize],
-            phase='test'
+            phase='test',
+            croppingfactor=trainer.croppingfactor,
+            cropping=trainer.cropping
         )
-        
+        print()
+        tag="idx: "+str(test_dataset.__getitem__(0).get("idx"))+"  has anomaly: "+str(test_dataset.__getitem__(0).get("has_anomaly"))+"  filename: "+str(test_dataset.__getitem__(0).get("file_name"))
+        writer.add_image(tag,test_dataset.__getitem__(0).get("imageBase"))
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, **kwargs)
         
         
@@ -190,16 +193,19 @@ class NetTrainer:
         gt_list = []
         class_score=0
         progressBar = tqdm(test_loader)
-        th=0.000175
+        th=0.00018
         area_th=100
-        test_timestamp=time.time()
-        hm_dir=trainer.save_path+'/heatmaps/'+str(datetime.fromtimestamp(test_timestamp))+"/"
-        os.mkdir(hm_dir)
+        test_timestamp=str(datetime.now().hour)+"_"+str(datetime.now().minute)
+        hm_dir=trainer.save_path+'/heatmaps/'+trainer.param_str+"/"+test_timestamp+"/"
+        if not os.path.isdir(hm_dir):
+            os.mkdir(hm_dir)
+        csv_path=trainer.save_path+'/csv/'+trainer.param_str+".csv"
         ctr=0
         y_true=[]
         y_score=[]
         
         for sample in test_loader:
+            
             #print("test")
             label=sample['has_anomaly']
             y_true.append(label.cpu().numpy()[0][0])
@@ -208,10 +214,22 @@ class NetTrainer:
             concat_prediction=0
             
             with torch.set_grad_enabled(False):
-            
-                print("not cropping")
-                features_s, features_t = infer(self,image)  
-                score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm) 
+                if trainer.cropping:
+                    print("cropping")
+                    cropped_scores=[]
+                    for cropped_img in crop_torch_img(image,trainer.croppingfactor):
+                        features_s, features_t = infer(self,cropped_img)
+                        score=cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm)
+                        cropped_scores.append(score)
+
+
+                    score=concat_hm(cropped_scores,trainer.croppingfactor)
+
+
+                else:
+                    print("not cropping")
+                    features_s, features_t = infer(self,image)  
+                    score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm) 
                 
                 f, axarr = plt.subplots(1,3)
                 im_fab=axarr[0].imshow(img_transposetorch2nparr(image.cpu().numpy()))#.astype('uint8'))
@@ -225,7 +243,7 @@ class NetTrainer:
 
                 plt.savefig(hm_dir+str(ctr)+"_predicted-"+pred_str+"__actual-"+("anomaly" if label.cpu().numpy()[0][0]==1 else "good")+"__numanomalypixel-" +str(num_anomalypixel)+'.png')
                 csv_arr=[str(class_score),str(th),str(label.cpu().numpy()[0][0]),str(prediction),str((score_bw == 0).sum()),str((score_bw > 0).sum())]
-                write_in_csv(trainer.save_path+'/csv/'+trainer.param_str+"-"+str(test_timestamp)+".csv",csv_arr)
+                write_in_csv(csv_path,csv_arr)
                 plt.close(f)
             if label.cpu().numpy()[0][0]==concat_prediction:
                 class_score+=1

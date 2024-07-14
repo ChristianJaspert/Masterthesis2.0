@@ -9,9 +9,10 @@ import sys
 
 class MVTecDataset(Dataset):
 
-    def __init__(self, root_dir, resize_shape=None,crop_size=None,phase="train"):
+    def __init__(self, root_dir, resize_shape=None,crop_size=None,phase="train",croppingfactor=4,cropping=True):
         self.root_dir = root_dir
-        
+        self.croppingfactor=croppingfactor
+        self.cropping=cropping
         image_extensions = ['png', 'tif', 'tiff', 'jpg', 'jpeg']
         pattern = f"{root_dir}/*/*" + '/'.join(f"*.{ext}" for ext in image_extensions)
 
@@ -38,19 +39,41 @@ class MVTecDataset(Dataset):
         
         
         image = cv2.imread(image_path, cv2.IMREAD_COLOR) #shape(h,w,rgb)
-     
-        
-        if self.resize_shape != None:
+        if self.cropping:
+            #print(image,self.croppingfactor)
+            cropped_img=self.crop_img(image,self.croppingfactor)
+            
+            concat_img=np.zeros((3,self.resize_shape[1]*self.croppingfactor,self.resize_shape[0]*self.croppingfactor))
+            i=0
+            for image in cropped_img:
+                if self.resize_shape != None:
             # cv2.resize(dsize(width,height))
             #resize_shape=(height,width)
-            image = cv2.resize(image, dsize=(self.resize_shape[1], self.resize_shape[0]))
+                    image = cv2.resize(image, dsize=(self.resize_shape[1], self.resize_shape[0]))
+                heigth,width=image.shape[0], image.shape[1]        
+                image = np.array(image).reshape((heigth,width, 3)).astype(np.float32)/ 255.0
+                
+                image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image = np.transpose(image, (2, 0, 1))
+                image=np.asarray(self.transform(torch.from_numpy(image)))
+                w=int(i/self.croppingfactor)
+                h=int(i%self.croppingfactor)
+                concat_img[:,h*heigth:(h+1)*heigth,w*width:(w+1)*width]=image
+                #print("h",int(i%self.croppingfactor),"w",int(i/self.croppingfactor))
+                i+=1
+            image=concat_img
+        else:
+            if self.resize_shape != None:
+                # cv2.resize(dsize(width,height))
+                #resize_shape=(height,width)
+                image = cv2.resize(image, dsize=(self.resize_shape[1], self.resize_shape[0]))
+                
+            image = np.array(image).reshape((image.shape[0], image.shape[1], 3)).astype(np.float32)/ 255.0
             
-        image = np.array(image).reshape((image.shape[0], image.shape[1], 3)).astype(np.float32)/ 255.0
-        
-        image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = np.transpose(image, (2, 0, 1))
-        image=np.asarray(self.transform(torch.from_numpy(image)))
-        #print("mvtec image",image.dtype)
+            image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = np.transpose(image, (2, 0, 1))
+            image=np.asarray(self.transform(torch.from_numpy(image)))
+            #print("mvtec image",image.dtype)
         if self.phase=="test":
             return image   
         else:
@@ -71,9 +94,30 @@ class MVTecDataset(Dataset):
                 has_anomaly = np.array([0], dtype=np.int64)
             else:
                 has_anomaly = np.array([1], dtype=np.int64)
-            sample = {'imageBase': image, 'has_anomaly': has_anomaly, 'idx': idx}
+            sample = {'imageBase': image, 'has_anomaly': has_anomaly, 'idx': idx, 'file_name':file_name}
         else:
             idx = torch.randint(0, len(self.image_paths), (1,)).item()
             image = self.transform_image(self.image_paths[idx])
             sample = {'imageBase': image}
         return sample
+    
+    def crop_img(self,img,croppingfactor): #shape(h,w,rgb)=(0,1,2)
+        '''
+        takes torch tensor with one sample image (shape: [1,rgb,height,width])
+        and a croppingfactor (eg. 4) that says what fraction of the image measurements the cropped ones have
+        (eg 1/4 of length and width -> 16 cropped images)
+        returns a list of cropped images in the following order:
+        first column of image then second and so on
+        '''
+        height,width = img.shape[0],img.shape[1] 
+        w_rest=width%croppingfactor
+        h_rest=height%croppingfactor
+        torch_img_rest = img[h_rest:height,w_rest:width,:]
+        height,width=torch_img_rest.shape[0],torch_img_rest.shape[1] 
+        list_cropped_torch_images=[]
+        for w in range(croppingfactor):
+            for h in range(croppingfactor):
+                torch_img_cropped=torch_img_rest[int(h*(height/croppingfactor)):int((h+1)*height/croppingfactor),int(w*width/croppingfactor):int((w+1)*width/croppingfactor),:]
+                #img_cropped=img_rest.crop((w*(width/factor),h*height/factor,(w+1)*width/factor,(h+1)*height/factor))
+                list_cropped_torch_images.append(torch_img_cropped)
+        return list_cropped_torch_images

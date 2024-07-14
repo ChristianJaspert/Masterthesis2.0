@@ -104,12 +104,17 @@ def loadModels(trainer):
         trainer.student2=studentTimm(backbone_name=trainer.modelName[1],out_indices=trainer.outIndices[1]).to(trainer.device)
     
 def loadDataset(trainer):
+    '''
+    cropping set to False, croppingfactor to None
+    '''
     #print("loadDataset")
     kwargs = ({"num_workers": 8, "pin_memory": True} if torch.cuda.is_available() else {})
     train_dataset = MVTecDataset(root_dir=trainer.data_path+"/"+trainer.obj+"/train/good",
         resize_shape=[trainer.img_resize_h,trainer.img_resize_w],
         crop_size=[trainer.img_cropsize,trainer.img_cropsize],
-        phase='train'
+        phase='train',
+        croppingfactor=None,
+        cropping=False
     )
     img_nums = len(train_dataset)
     valid_num = int(img_nums * trainer.validation_ratio)
@@ -118,7 +123,7 @@ def loadDataset(trainer):
         train_dataset, [train_num, valid_num]
     )
 
-    writer.add_image("test",train_dataset.__getitem__(0).get("imageBase"))
+    #writer.add_image("test",train_dataset.__getitem__(0).get("imageBase"))
                                                                   #kwargs=num_workers etc dependent on gpu available or not
     trainer.train_loader=torch.utils.data.DataLoader(train_data, batch_size=trainer.batch_size, shuffle=True, **kwargs) 
     
