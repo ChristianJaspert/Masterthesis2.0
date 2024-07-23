@@ -1,7 +1,7 @@
 import os
 import torch
 import torch.nn.functional as F
-from sklearn.metrics import roc_auc_score,roc_curve
+from sklearn.metrics import roc_auc_score,roc_curve,RocCurveDisplay
 from models.teacher import teacherTimm
 from models.StudentTeacher.student  import studentTimm
 from datasets.mvtec import MVTecDataset
@@ -9,6 +9,7 @@ from models.EfficientAD.efficientAD import loadPdnTeacher
 from models.EfficientAD.common import get_pdn_medium,get_pdn_small
 from models.ReverseDistillation.rd import loadBottleNeckRD, loadStudentRD
 from models.DBFAD.reverseResidual import reverse_student18
+from torcheval.metrics import BinaryConfusionMatrix
 import sys
 from PIL import Image
 import numpy as np
@@ -166,7 +167,26 @@ def computeAUROC(scores,gt_list,obj,name="base"):
     img_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
     img_roc_auc = roc_auc_score(gt_list, img_scores)
     print(obj + " image"+str(name)+" ROCAUC: %.3f" % (img_roc_auc))
-    return img_roc_auc,img_scores  
+    
+    _1,_2,ths=computeROCcurve(gt_list,img_scores)
+    
+    writer.add_pr_curve("Precision Recall Curve "+obj,np.array(gt_list[:,0]),np.array(img_scores),None,100)
+    roc_curve=RocCurveDisplay.from_predictions(np.array(gt_list[:,0]),np.array(img_scores)).figure_
+    writer.add_figure("ROC curve "+obj,roc_curve)
+    for i in range(10):
+        metric=BinaryConfusionMatrix(threshold=0.1*i)
+        metric.update(torch.tensor(img_scores),torch.tensor(gt_list[:,0]))
+        if i==0:
+            optmatrix=metric.compute()
+            optth=i
+        else:
+            if optmatrix[0][0]+optmatrix[1][1]<metric.compute()[0][0]+metric.compute()[1][1]:
+                optmatrix=metric.compute()
+                optth=i
+        #print(metric.compute())
+    print("Optimal Matrix for th %.3f:" %(optth))
+    print(optmatrix)
+    return img_roc_auc,img_scores 
 
 def cal_importance(ft, fs,norm):
 

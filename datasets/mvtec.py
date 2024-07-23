@@ -25,7 +25,7 @@ class MVTecDataset(Dataset):
         self.resize_shape=resize_shape
         if (crop_size==None):
             crop_size=min(resize_shape[0],resize_shape[1])
-        #self.transform=T.Compose([T.CenterCrop(crop_size),T.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])])
+        self.transform=T.Compose([T.CenterCrop(crop_size),T.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])])
         self.transform=T.Compose([T.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])])
         self.phase=phase
         

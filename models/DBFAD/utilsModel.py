@@ -48,7 +48,8 @@ class conv1BnRelu(nn.Module):
         x = self.bn(x)
         return x
 
-
+#Attention Block used in the Attention module which is used as distillation connection
+#Attention2 is the same but only with two convolution layer
 class Attention(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, padding=0):
         super(Attention, self).__init__()

@@ -2,6 +2,7 @@ import torch.nn as nn
 from torch.nn import ConvTranspose2d 
 from models.DBFAD.utilsModel import  conv3BnRelu, conv1BnRelu, Attention, Attention2, BasicBlockDe
 from models.sspcab import SSPCAB
+import sys
 
 
 
@@ -25,6 +26,8 @@ class ReverseStudent(nn.Module):
         self.groups = groups
         self.base_width = 64
 
+
+        #Blocks for the feature fusion{
         self.block1 = nn.Sequential(
             
             conv1BnRelu(64, 128, stride=2, padding=0), 
@@ -40,6 +43,8 @@ class ReverseStudent(nn.Module):
         self.block4 = nn.Sequential(
             conv1BnRelu(256, 256, stride=1, padding=0)
         )
+        #}
+        #BottleNeck{
         self.block5 = nn.Sequential(
             conv1BnRelu(256, 256, stride=1, padding=0),
             conv1BnRelu(256, 256, stride=1, padding=0),
@@ -49,6 +54,9 @@ class ReverseStudent(nn.Module):
         self.AttBlock = nn.Sequential(
             Attention2(512, 512)
         )
+        #}
+
+        #Distillation residual layer between Teacher and student
         if not self.DG:
             self.residualLayer0_1 = nn.Sequential(
                 conv3BnRelu(64, 64, stride=1, padding=1),
@@ -66,6 +74,7 @@ class ReverseStudent(nn.Module):
             )
 
         #print("lb",layers,block)
+        #Normal layers of Student
         self.layer0 = self._make_layer(block, 256, layers[0], stride=2)
         self.layer1 = self._make_layer(block, 128, layers[0], stride=2)
         self.layer2 = self._make_layer(block, 64, layers[1], stride=2)
@@ -105,8 +114,12 @@ class ReverseStudent(nn.Module):
 
         return nn.Sequential(*layers)
 
+    #here first the feature fusion and then the bottleneck are 
+    #calculated and give as output the input for the studetnt decoder
+    #x is the tensor of features_t from the teacher
     def _forward_impl(self, x):
-        #print("x",x[0].shape)
+        #print("forward_impl_revResid",x[0].shape,x[0][0][0][0])
+
         out1 = self.block1(x[0])
         out2 = self.block2(x[1])
         out3 = self.block3(x[2])
@@ -121,7 +134,8 @@ class ReverseStudent(nn.Module):
             resi2 = self.residualLayer1_2(x[1])
             resi3 = self.residualLayer2_3(x[2])
 
-        feature_x = self.layer0(out)
+        #!!!!!!!!!!!!!!!!!!!!!!these things were after the first feature_x calculation:
+
         #print(x[2],"x[2]")
         #print(self.residualLayer2_3(x[2]).shape,"residualLayer")
         #print(resi3.shape,"resi3")
@@ -129,12 +143,14 @@ class ReverseStudent(nn.Module):
         
         #print(feature_x.shape,"feature_X=layer0(out)")
         #print(self.layer0)
+        feature_x = self.layer0(out)
         feature_x = feature_x + resi3 if not self.DG else feature_x
         feature_a = self.layer1(feature_x)  
         feature_a = feature_a+resi2 if not self.DG else feature_a
         feature_b = self.layer2(feature_a)  
         feature_b = feature_b+resi1 if not self.DG else feature_b
         feature_c = self.layer3(feature_b)
+
         return feature_c, feature_b, feature_a, feature_x
 
     def forward(self, x):

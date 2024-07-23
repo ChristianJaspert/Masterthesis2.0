@@ -1,4 +1,4 @@
-import timm
+import timm #collection of pretrained image NNs
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,6 +17,7 @@ class teacherTimm(nn.Module):
             out_indices=out_indices 
         )
         self.feature_extractor.eval() 
+        #freezeing of teacher parameters:
         for param in self.feature_extractor.parameters():
             #param=param.type(torch.float64)
             #print("models/teacher.py",param.dtype)

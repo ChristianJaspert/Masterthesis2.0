@@ -3,6 +3,7 @@ import yaml
 import torch
 import random
 import numpy as np
+import os
 
 
 
@@ -64,6 +65,5 @@ def denormalization(x):
 
     return x
 
-# with open("/home/christianjaspert/masterthesis/distillation/DistillationAD/config.yaml") as f:
-#     data=yaml.safe_load(f)
-#     print(data)
+
+

@@ -1,12 +1,11 @@
 import os
-from datetime import datetime
 import sys
 from PIL import Image
+import cv2
 from matplotlib import pyplot as plt
 import time
 import numpy as np
 import torch
-from torcheval.metrics import BinaryConfusionMatrix
 from tqdm import tqdm
 from datasets.mvtec import MVTecDataset
 from utils.util import  AverageMeter,readYamlConfig,set_seed
@@ -19,6 +18,8 @@ from utils.functions import (
     crop_torch_img,
     img_transposetorch2nparr,
     concat_hm,
+    save_csv_hm,
+    generate_result_path
     
 )
 from utilsTraining import getParams,loadWeights,loadModels,loadDataset,infer,computeAUROC,computeROCcurve
@@ -182,40 +183,35 @@ class NetTrainer:
             croppingfactor=trainer.croppingfactor,
             cropping=trainer.cropping
         )
-        print()
         tag="idx: "+str(test_dataset.__getitem__(0).get("idx"))+"  has anomaly: "+str(test_dataset.__getitem__(0).get("has_anomaly"))+"  filename: "+str(test_dataset.__getitem__(0).get("file_name"))
         writer.add_image(tag,test_dataset.__getitem__(0).get("imageBase"))
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, **kwargs)
+        progressBar = tqdm(test_loader)
+        
+    
+        blendfactor=0.4
+        hm_sorting=False
+        
         
         
         
         scores = []
         gt_list = []
-        class_score=0
-        progressBar = tqdm(test_loader)
-        th=0.00018
-        area_th=100
-        test_timestamp=str(datetime.now().hour)+"_"+str(datetime.now().minute)
-        hm_dir=trainer.save_path+'/heatmaps/'+trainer.param_str+"/"+test_timestamp+"/"
-        if not os.path.isdir(hm_dir):
-            os.mkdir(hm_dir)
-        csv_path=trainer.save_path+'/csv/'+trainer.param_str+".csv"
-        ctr=0
-        y_true=[]
-        y_score=[]
-        
+        #y_true=[]
+        hm_dir_basis,csv_path=generate_result_path(self)
         for sample in test_loader:
             
-            #print("test")
             label=sample['has_anomaly']
-            y_true.append(label.cpu().numpy()[0][0])
+            #y_true.append(label.cpu().numpy()[0][0])
             image = sample['imageBase'].to(self.device)
             gt_list.extend(label.cpu().numpy())
             concat_prediction=0
             
             with torch.set_grad_enabled(False):
                 if trainer.cropping:
-                    print("cropping")
+                    #print("cropping")
+                    th=0.4 #in % between 0 and 1
+                    area_th=20000
                     cropped_scores=[]
                     for cropped_img in crop_torch_img(image,trainer.croppingfactor):
                         features_s, features_t = infer(self,cropped_img)
@@ -224,51 +220,33 @@ class NetTrainer:
 
 
                     score=concat_hm(cropped_scores,trainer.croppingfactor)
-
-
                 else:
-                    print("not cropping")
+                    th=0.875 #in % between 0 and 1
+                    area_th=100
+                    #print("not cropping")
                     features_s, features_t = infer(self,image)  
-                    score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm) 
-                
-                f, axarr = plt.subplots(1,3)
-                im_fab=axarr[0].imshow(img_transposetorch2nparr(image.cpu().numpy()))#.astype('uint8'))
-                #numpy image: (height,width,rgb)
-                im_hm=axarr[1].imshow(score, interpolation='nearest', cmap='viridis',vmin=0,vmax=0.0002)#,vmin=0,vmax=0.0002)
-                f.colorbar(im_hm)
-                score_bw=th_img(score,th)
-                im_hm2=axarr[2].imshow(score_bw, interpolation='nearest', cmap='viridis',vmin=0,vmax=0.0002)
-                f.colorbar(im_hm2)
-                prediction,pred_str,num_anomalypixel=get_classification(score_bw,area_th)
+                    score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm)
 
-                plt.savefig(hm_dir+str(ctr)+"_predicted-"+pred_str+"__actual-"+("anomaly" if label.cpu().numpy()[0][0]==1 else "good")+"__numanomalypixel-" +str(num_anomalypixel)+'.png')
-                csv_arr=[str(class_score),str(th),str(label.cpu().numpy()[0][0]),str(prediction),str((score_bw == 0).sum()),str((score_bw > 0).sum())]
-                write_in_csv(csv_path,csv_arr)
-                plt.close(f)
-            if label.cpu().numpy()[0][0]==concat_prediction:
-                class_score+=1
+                  
+            save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendingfactor=blendfactor)
+               
+            
 
-                #progressBar.update()
-
-            ctr+=1   
+            progressBar.update() 
             scores.append(score)
-        #print(str(class_score//len(test_loader)))
+
         progressBar.close()
         scores = np.asarray(scores)
         gt_list = np.asarray(gt_list)
 
-        #print(gt_list)
 
         img_roc_auc,y_score=computeAUROC(scores,gt_list,self.obj," "+self.distillType)
-        fpr,tpr,ths=computeROCcurve(y_true,y_score)
-        #print(type(fpr))
-        #writer.add_scalars('ROC',tpr,fpr)
-        writer.add_pr_curve("ROC "+str(self.obj),np.array(y_true),np.array(y_score),None,len(ths))
-        metric=BinaryConfusionMatrix()
-        metric.update(torch.tensor(y_score),torch.tensor(y_true))
-        print(metric.compute())
-        #( (true positive, false negative)
-        # (false positive, true negative) )
+        
+        
+        #confusion matrix:
+        #              predicted
+        #actual     ((true positive, false negative)
+        #            (false positive, true negative) )
     
         return img_roc_auc
     

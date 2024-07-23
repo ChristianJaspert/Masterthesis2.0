@@ -2,7 +2,8 @@ data_path: "/home/christianjaspert/masterthesis/DistillationAD/datasets/MVTEC"
 distillType: dbfad #st #st #dbfad # rd,ead, st
 backbone: resnet18 # any cnn model for, any resnet or wide resnet for rd, medium or small for ead
 out_indice: [2,3] # for st
-obj: fabric_cropped_png_like_mvtec_NOT_cropped_test # w625 h337 test: w2500 h1350#
+obj: fabric_cropped_png_like_mvtec_hm_anomalie_NOT_cropped_test # w625 h337 test: w2500 h1350#
+#obj: fabric_cropped_png_like_mvtec_NOT_cropped_test # w625 h337 test: w2500 h1350#
 #obj: fabric_cropped_png_like_mvtec #w625 h337
 #obj: carpet #carpet
 #obj: fabric2cropped_png #w1250 h675
