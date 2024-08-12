@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from typing import Callable, Optional
 
+
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, padding: int = 1) -> nn.Conv2d:
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
@@ -68,17 +69,15 @@ class Attention(nn.Module):
 
         x3 = self.conv3(x2)
         x3 = self.softmax(x3)
-
+        #print("attention",(x3*x1).shape)
         return x3 * x1
 
 
 class Attention2(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(Attention2, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels,
-                               kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(out_channels, out_channels,
-                               kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels, out_channels,kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x):
@@ -87,8 +86,149 @@ class Attention2(nn.Module):
 
         x2 = self.conv2(x1)
         x2 = self.softmax(x2)
-
+        #print("attention2",x2.shape,x1.shape)
         return x2 * x1
+    
+class Attention3(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(Attention3, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels,kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        x1 = self.conv1(x)
+        x1 = F.relu(x1)
+
+        x2 = self.conv2(x1)
+        x2 = F.relu(x2)
+
+        x3 = self.conv3(x2)
+        x3 = self.softmax(x3)
+
+        return x3 * x1
+    
+class Attention4(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(Attention4, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels,kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        x1 = self.conv1(x)
+        x1 = F.relu(x1)
+
+        x2 = self.conv2(x1)
+        x2 = F.relu(x2)
+
+        x3 = self.conv3(x2)
+        x3 = F.relu(x3)
+
+        x4 = self.conv4(x3)
+        x4 = self.softmax(x4)
+
+        return x4 * x1
+    
+class Attention5(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(Attention5, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels,kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        x1 = self.conv1(x)
+        x1 = F.relu(x1)
+
+        x2 = self.conv2(x1)
+        x2 = F.relu(x2)
+
+        x3 = self.conv3(x2)
+        x3 = F.relu(x3)
+
+        x4 = self.conv4(x3)
+        x4 = F.relu(x4)
+
+        x5 = self.conv5(x4)
+        x5 = self.softmax(x5)
+
+        return x5 * x1
+
+class Attention6(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(Attention6, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels,kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv6 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        x1 = self.conv1(x)
+        x1 = F.relu(x1)
+
+        x2 = self.conv2(x1)
+        x2 = F.relu(x2)
+
+        x3 = self.conv3(x2)
+        x3 = F.relu(x3)
+
+        x4 = self.conv4(x3)
+        x4 = F.relu(x4)
+
+        x5 = self.conv5(x4)
+        x5 = F.relu(x5)
+
+        x6 = self.conv6(x5)
+        x6 = self.softmax(x6)
+
+        return x6 * x1
+    
+class Attention7(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(Attention7, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels,kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv6 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.conv7 = nn.Conv2d(out_channels, out_channels,kernel_size=3, padding=1)
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        x1 = self.conv1(x)
+        x1 = F.relu(x1)
+
+        x2 = self.conv2(x1)
+        x2 = F.relu(x2)
+
+        x3 = self.conv3(x2)
+        x3 = F.relu(x3)
+
+        x4 = self.conv4(x3)
+        x4 = F.relu(x4)
+
+        x5 = self.conv5(x4)
+        x5 = F.relu(x5)
+
+        x6 = self.conv6(x5)
+        x6 = F.relu(x6)
+
+        x7 = self.conv7(x6)
+        x7 = self.softmax(x7)
+
+        return x7 * x1
+
 
 
 

@@ -4,11 +4,12 @@ from PIL import Image
 import cv2
 from matplotlib import pyplot as plt
 import time
+from datetime import timedelta
 import numpy as np
 import torch
 from tqdm import tqdm
 from datasets.mvtec import MVTecDataset
-from utils.util import  AverageMeter,readYamlConfig,set_seed
+from utils.util import  AverageMeter,readYamlConfig,set_seed,convert_secs2time
 from utils.functions import (
     cal_loss,
     cal_anomaly_maps,
@@ -19,7 +20,8 @@ from utils.functions import (
     img_transposetorch2nparr,
     concat_hm,
     save_csv_hm,
-    generate_result_path
+    generate_result_path,
+    save_log_csv
     
 )
 from utilsTraining import getParams,loadWeights,loadModels,loadDataset,infer,computeAUROC,computeROCcurve
@@ -70,9 +72,12 @@ class NetTrainer:
             self.num_epochs=epochs
         # You can set seed for reproducibility
         set_seed(42)
-        
+        #inittime=time.time()
         loadModels(self)
+        #print("Load models time(h:m:s): ",convert_secs2time(inittime-time.time()))
         loadDataset(self)
+        #print("Load models and dataset time(h:m:s): ",convert_secs2time(inittime-time.time()))
+        #sys.exit()
         #print(type(train_data))
         #print("ohne np",train_dataset.__getitem__(0).get("imageBase").shape)              
         #print("mit np",np.asarray(train_dataset.__getitem__(0).get("imageBase")).shape)
@@ -92,14 +97,17 @@ class NetTrainer:
         self.student.train() 
         best_score = None
         start_time = time.time()
+        ttime=start_time
         epoch_time = AverageMeter()
         epoch_bar = tqdm(total=len(self.train_loader) * self.num_epochs,desc="Training",unit="batch")
         losslist=[]
-
         for _ in range(1, self.num_epochs + 1):
+            
             losses = AverageMeter()
             loss_epoch=0
+            i=0
             for sample in self.train_loader:
+                i=i+1
                 image = sample['imageBase'].to(self.device)
                 self.optimizer.zero_grad()
                 with torch.set_grad_enabled(True):
@@ -111,10 +119,10 @@ class NetTrainer:
                     loss.backward()
                     self.optimizer.step()
                     self.scheduler.step()
-                epoch_bar.set_postfix({"Loss": loss.item()})
+                epoch_bar.set_postfix({"Loss": loss.item(),"e":_,"i":i,"tni":len(self.train_loader),"EpTav":convert_secs2time(epoch_time.avg)}) #,"Time/epoch":convert_secs2time(etime)})
                 epoch_bar.update()
                 #0print(loss_epoch.item())
-            writer.add_scalar('training loss '+str(self.obj),loss_epoch,_)
+            writer.add_scalar('training loss '+str(self.obj)+"-"+self.myworklabel,loss_epoch,_)
                
             
             val_loss = self.val(epoch_bar)
@@ -125,11 +133,16 @@ class NetTrainer:
                 best_score = val_loss
                 self.save_checkpoint()
             
-            writer.add_scalars('losses lr: '+str(self.obj)+": "+str(self.lr),{'training loss':loss_epoch.item(),'validation loss':val_loss},_)
+            writer.add_scalars('losses lr: '+str(self.obj)+"-"+self.myworklabel+": "+str(self.lr),{'training loss':loss_epoch.item(),'validation loss':val_loss},_)
             losslist.append([loss_epoch.item(),val_loss])
             epoch_time.update(time.time() - start_time)
+            #print("epoch time",convert_secs2time(epoch_time.val))
+            epoch_bar.set_postfix({"Loss": loss.item(),"EpT":convert_secs2time(epoch_time.val)}) #,"Time/epoch":convert_secs2time(etime)})
+            epoch_bar.update
             start_time = time.time()
-            print("test")
+        traintime=time.time()-ttime
+        self.traintime=traintime
+        print("training time in sec", convert_secs2time(traintime))
         epoch_bar.close()
         print("Training end.")
         return losslist      
@@ -172,11 +185,15 @@ class NetTrainer:
         if self.distillType=="mixed":
             self.student2=loadWeights(self.student2,self.model_dir,"student2.pth")
         
+
         
         kwargs = ({"num_workers": 1, "pin_memory": True} if torch.cuda.is_available() else {} )
-        
+        if self.cropping:
+            test_path=self.data_path+"/"+self.obj+"/test/not_cropped/"
+        else:
+            test_path=self.data_path+"/"+self.obj+"/test/cropped/"
         test_dataset = MVTecDataset(
-            root_dir=self.data_path+"/"+self.obj+"/test/",
+            root_dir=test_path,
             resize_shape=[self.img_resize_h,self.img_resize_w],
             crop_size=[self.img_cropsize,self.img_cropsize],
             phase='test',
@@ -188,17 +205,11 @@ class NetTrainer:
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, **kwargs)
         progressBar = tqdm(test_loader)
         
-    
-        blendfactor=0.4
-        hm_sorting=False
-        
-        
-        
         
         scores = []
         gt_list = []
         #y_true=[]
-        hm_dir_basis,csv_path=generate_result_path(self)
+        hm_dir_basis,csv_path,test_timestamp=generate_result_path(self)
         for sample in test_loader:
             
             label=sample['has_anomaly']
@@ -213,13 +224,12 @@ class NetTrainer:
                     th=0.4 #in % between 0 and 1
                     area_th=20000
                     cropped_scores=[]
-                    for cropped_img in crop_torch_img(image,trainer.croppingfactor):
+                    for cropped_img in crop_torch_img(image,trainer.croppingfactor,trainer.overlapfactor):
                         features_s, features_t = infer(self,cropped_img)
                         score=cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm)
                         cropped_scores.append(score)
 
-
-                    score=concat_hm(cropped_scores,trainer.croppingfactor)
+                    score=concat_hm(image,cropped_scores,trainer.croppingfactor)
                 else:
                     th=0.875 #in % between 0 and 1
                     area_th=100
@@ -228,7 +238,7 @@ class NetTrainer:
                     score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm)
 
                   
-            save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendingfactor=blendfactor)
+            save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,th,area_th,self.blendfactor)
                
             
 
@@ -240,8 +250,8 @@ class NetTrainer:
         gt_list = np.asarray(gt_list)
 
 
-        img_roc_auc,y_score=computeAUROC(scores,gt_list,self.obj," "+self.distillType)
-        
+        img_roc_auc,y_score,optmatrix,th=computeAUROC(scores,gt_list,self.obj+"-"+self.myworklabel," "+self.distillType)
+        save_log_csv(self,optmatrix,th,test_timestamp,img_roc_auc)
         
         #confusion matrix:
         #              predicted

@@ -2,17 +2,24 @@ data_path: "/home/christianjaspert/masterthesis/DistillationAD/datasets/MVTEC"
 distillType: dbfad #st #st #dbfad # rd,ead, st
 backbone: resnet18 # any cnn model for, any resnet or wide resnet for rd, medium or small for ead
 out_indice: [2,3] # for st
-obj: fabric_cropped_png_like_mvtec_hm_anomalie_NOT_cropped_test # w625 h337 test: w2500 h1350#
-#obj: fabric_cropped_png_like_mvtec_NOT_cropped_test # w625 h337 test: w2500 h1350#
-#obj: fabric_cropped_png_like_mvtec #w625 h337
+
+myworklabel: "DistillationLayer5"
+myworkswitch: False
+
+#obj: myfabric_hm_anomalie
+obj: myfabric_dataset #w625 h337 not cropped test: w2500 h1350#
 #obj: carpet #carpet
 #obj: fabric2cropped_png #w1250 h675
+debugparams: False
 phase: test
 save_path: "./results"
-cropping: True
-#cropping: False
+save_path_modified_architecture: "./results_modified_architecture"
+hm_sorting: True
+blendfactor: 0.4
+cropping: True #False: uses the cropped tiny pictures in the test phase, True: uses the big pictures and crops them
 croppingfactor: 4
-threshold: 0.00001
+overlapfactor: 0 #.404
+threshold: 0.0001
 TrainingData:
   epochs: 50 #100
   batch_size: 4 #4

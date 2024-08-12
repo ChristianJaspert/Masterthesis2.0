@@ -22,14 +22,24 @@ def getParams(trainer,data,device):
     trainer.device = device
     trainer.validation_ratio = 0.2
     trainer.data_path = data['data_path']
+    trainer.debugmode=data['debugparams']
+    trainer.phase=data['phase']
+    
     trainer.obj = data['obj']
+    trainer.num_epochs = data['TrainingData']['epochs']
     trainer.img_resize_h = data['TrainingData']['img_size_h']
     trainer.img_resize_w = data['TrainingData']['img_size_w']
     trainer.img_cropsize = data['TrainingData']['crop_size'] #for centercrop mvtec
-    trainer.num_epochs = data['TrainingData']['epochs']
     trainer.lr = data['TrainingData']['lr']
-    trainer.batch_size = data['TrainingData']['batch_size']   
-    trainer.save_path = data['save_path']
+    trainer.batch_size = data['TrainingData']['batch_size'] 
+    trainer.myworkswitch=data['myworkswitch'] 
+    trainer.myworklabel=data['myworklabel']
+    if data['myworkswitch']:
+        trainer.save_path = data['save_path_modified_architecture']+"/"+data['myworklabel']
+    else: 
+        trainer.save_path = data['save_path']
+    trainer.hm_sorting=data['hm_sorting']
+    trainer.blendfactor=data['blendfactor']
     trainer.model_dir = trainer.save_path+ "/models" + "/" + trainer.obj  
     trainer.img_dir = trainer.save_path+ "/imgs" + "/" + trainer.obj 
     trainer.modelName = data['backbone']
@@ -37,12 +47,17 @@ def getParams(trainer,data,device):
     trainer.distillType=data['distillType']
     trainer.norm = data['TrainingData']['norm']
     trainer.threshold=data['threshold']
-    trainer.param_str=str(data['obj'])+"_"+str(data['TrainingData']['epochs'])+"_"+str(data['TrainingData']['batch_size'])+"_"+str(data['TrainingData']['lr'])
+    trainer.param_str=str(data['obj'])+"_"+str("NOTcropped" if data['cropping'] else "cropped")+"_"+str(data['TrainingData']['epochs'])+"_"+str(data['TrainingData']['batch_size'])+"_"+str(data['TrainingData']['lr'])
     trainer.cropping=data['cropping'] #my own cropping for hd image downsizing
     trainer.croppingfactor=data['croppingfactor']
+    trainer.overlapfactor=data['overlapfactor']
     trainer.test_img_resize_h = data['TestData']['img_size_h']
     trainer.test_img_resize_w = data['TestData']['img_size_w']
     trainer.test_img_cropsize = data['TestData']['crop_size']
+    if data['debugparams']:
+        trainer.obj = "fabric_not_cropped_DEBUGGING"
+        trainer.num_epochs = 1
+        trainer.save_path="./results_Debugging"
     
 def loadWeights(model,model_dir,alias):
     #print("loadWeights")
@@ -147,9 +162,11 @@ def infer(trainer, img):
         embed=trainer.bn(features_t)
         features_s=trainer.student(embed)
     if (trainer.distillType=="dbfad"):
+        #writer.add_graph(trainer.teacher,img)
         features_t = trainer.teacher(img)
         features_t = [F.max_pool2d(features_t[0],kernel_size=3,stride=2,padding=1),features_t[1],features_t[2],features_t[3]]
         features_s=trainer.student(features_t)
+        #writer.add_graph(trainer.student,features_t)
     if (trainer.distillType=="mixed"):
         features_t = trainer.teacher(img)
         features_t2 = trainer.teacher2(img)
@@ -158,7 +175,6 @@ def infer(trainer, img):
         features_s=list(features_s)+list(features_s2)
         features_t=list(features_t)+list(features_t2)
     return features_s,features_t
-
 
 def computeAUROC(scores,gt_list,obj,name="base"):
     max_anomaly_score = scores.max()
@@ -186,7 +202,7 @@ def computeAUROC(scores,gt_list,obj,name="base"):
         #print(metric.compute())
     print("Optimal Matrix for th %.3f:" %(optth))
     print(optmatrix)
-    return img_roc_auc,img_scores 
+    return img_roc_auc,img_scores,optmatrix,optth
 
 def cal_importance(ft, fs,norm):
 

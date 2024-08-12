@@ -30,20 +30,20 @@ def time_string():
     string = '[{}]'.format(time.strftime(ISOTIMEFORMAT, time.localtime()))
     return string
 
-
 def convert_secs2time(epoch_time):
+    '''
+    (h:m:s)
+    '''
     need_hour = int(epoch_time / 3600)
     need_mins = int((epoch_time - 3600 * need_hour) / 60)
     need_secs = int(epoch_time - 3600 * need_hour - 60 * need_mins)
     return need_hour, need_mins, need_secs
 
-
 def itr_merge(*itrs):
     for itr in itrs:
         for v in itr:
             yield v
-            
-            
+                      
 def readYamlConfig(configFileName):
     with open(configFileName) as f:
         data=yaml.safe_load(f)
