@@ -115,7 +115,7 @@ def crop_torch_img(torch_img,croppingfactor,overlapfactor):
     #sys.exit()
     for w in range(stepsw):
         for h in range(stepsh):
-            torch_img_cropped=torch_img_rest[:,:,h*(cropheight-overlapheight):(h+1)*(cropheight-overlapheight),w*(cropwidth-overlapwidth):(w+1)*(cropwidth-overlapwidth)]
+            torch_img_cropped=torch_img_rest[:,:,h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]
             #img_cropped=img_rest.crop((w*(width/factor),h*height/factor,(w+1)*width/factor,(h+1)*height/factor))
             list_cropped_torch_images.append(torch_img_cropped)
             
@@ -153,13 +153,25 @@ def concat_hm(image,cropped_scores,croppingfactor,overlapfactor):
             #print(cropped_scores[i].shape)
             overlaymethod="max"
             if overlaymethod=="max":
-                score[h*(cropheight-overlapheight):(h+1)*(cropheight-overlapheight),w*(cropwidth-overlapwidth):(w+1)*(cropwidth-overlapwidth)]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):(h+1)*(cropheight-overlapheight),w*(cropwidth-overlapwidth):(w+1)*(cropwidth-overlapwidth)])
+                score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
             elif overlaymethod=="min":
-                score[h*(cropheight-overlapheight):(h+1)*(cropheight-overlapheight),w*(cropwidth-overlapwidth):(w+1)*(cropwidth-overlapwidth)]=np.minimum(cropped_scores[i],score[h*(cropheight-overlapheight):(h+1)*(cropheight-overlapheight),w*(cropwidth-overlapwidth):(w+1)*(cropwidth-overlapwidth)])
+                score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.minimum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
             elif overlaymethod=="average":
-                
+                if w==0 and h==0:
+                    score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
+                    score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
+                    score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
+                    score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
+                if w==0 and h>0:
+                    
+                if w>0 and h==0:
+
+                if w>0 and h>0:
+
+            
             i+=1
     return gaussian_filter(score, sigma=4)
+
 
 def th_method_AUROC(prediction_actual_list):
     '''
