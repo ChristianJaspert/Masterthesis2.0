@@ -13,11 +13,11 @@ from utils.util import  AverageMeter,readYamlConfig,set_seed,convert_secs2time
 from utils.functions import (
     cal_loss,
     cal_anomaly_maps,
-    th_img,
-    write_in_csv,
-    get_classification,
+    #th_img,
+    #write_in_csv,
+    #get_classification,
     crop_torch_img,
-    img_transposetorch2nparr,
+    #img_transposetorch2nparr,
     concat_hm,
     save_csv_hm,
     generate_result_path,
@@ -201,7 +201,6 @@ class NetTrainer:
             cropping=trainer.cropping
         )
         tag="idx: "+str(test_dataset.__getitem__(0).get("idx"))+"  has anomaly: "+str(test_dataset.__getitem__(0).get("has_anomaly"))+"  filename: "+str(test_dataset.__getitem__(0).get("file_name"))
-        writer.add_image(tag,test_dataset.__getitem__(0).get("imageBase"))
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, **kwargs)
         progressBar = tqdm(test_loader)
         
@@ -229,7 +228,7 @@ class NetTrainer:
                         score=cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm)
                         cropped_scores.append(score)
 
-                    score=concat_hm(image,cropped_scores,trainer.croppingfactor)
+                    score=concat_hm(image,cropped_scores,trainer.croppingfactor,trainer.overlapfactor)
                 else:
                     th=0.875 #in % between 0 and 1
                     area_th=100

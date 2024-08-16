@@ -109,7 +109,7 @@ def crop_torch_img(torch_img,croppingfactor,overlapfactor):
     list_cropped_torch_images=[]
     #print(h_rest,height,cropheight,overlapheight)
     #print((height-cropheight)/(cropheight-overlapheight))
-    print(w_rest,width,cropwidth,overlapwidth)
+    #print(w_rest,width,cropwidth,overlapwidth)
     stepsh=int((height-cropheight)/(cropheight-overlapheight)+1)
     stepsw=int((width-cropwidth)/(cropwidth-overlapwidth)+1)
     #sys.exit()
@@ -128,7 +128,7 @@ def img_transposetorch2nparr(torchtensor):
     '''
     return torchtensor[0,:,:,:].transpose(1,2,0)
 
-def concat_hm(image,cropped_scores,croppingfactor,overlapfactor):
+def concat_hm(torch_img,cropped_scores,croppingfactor,overlapfactor):
     '''
     concatenates heatmaps in following order:
     first column, second column and so on
@@ -136,7 +136,7 @@ def concat_hm(image,cropped_scores,croppingfactor,overlapfactor):
     croppingfactor (eg. 4) that says what fraction of the image measurements the cropped ones have
     (eg 1/4 of length and width -> 16 cropped images))
     '''
-    height,width=image.shape
+    height,width=torch_img.shape[2],torch_img.shape[3]
     cropheight,cropwidth=cropped_scores[0].shape
     overlapheight=int(cropheight*overlapfactor)
     overlapwidth=int(cropwidth*overlapfactor)
@@ -148,27 +148,86 @@ def concat_hm(image,cropped_scores,croppingfactor,overlapfactor):
     stepsw=int((width-cropwidth)/(cropwidth-overlapwidth)+1)
     score=np.zeros((cropheight*croppingfactor,cropwidth*croppingfactor))
     i=0
+    img_innertop=overlapheight
+    img_innerright=cropwidth-overlapwidth
+    img_innerleft=overlapwidth
+    img_innerbottom=cropheight-overlapheight
     for w in range(stepsw):
         for h in range(stepsh):
             #print(cropped_scores[i].shape)
-            overlaymethod="max"
+            top=h*(cropheight-overlapheight)
+            left=w*(cropwidth-overlapwidth)
+            right=w*(cropwidth-overlapwidth)+cropwidth
+            bottom=h*(cropheight-overlapheight)+cropheight
+            innertop=h*(cropheight-overlapheight)+overlapheight
+            innerleft=w*(cropwidth-overlapwidth)+overlapwidth
+            innerright=(w+1)*(cropwidth-overlapwidth)
+            innerbottom=(h+1)*(cropheight-overlapheight)
+            overlaymethod="average"
             if overlaymethod=="max":
-                score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
+                score[top:bottom,left:right]=np.maximum(cropped_scores[i],score[top:bottom,left:right])
             elif overlaymethod=="min":
-                score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.minimum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
+                score[top:bottom,left:right]=np.minimum(cropped_scores[i],score[top:bottom,left:right])
             elif overlaymethod=="average":
+
                 if w==0 and h==0:
-                    score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
-                    score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
-                    score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
-                    score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth]=np.maximum(cropped_scores[i],score[h*(cropheight-overlapheight):h*(cropheight-overlapheight)+cropheight,w*(cropwidth-overlapwidth):w*(cropwidth-overlapwidth)+cropwidth])
-                if w==0 and h>0:
-                    
-                if w>0 and h==0:
-
-                if w>0 and h>0:
-
-            
+                    score[top:innerbottom,left:innerright]=cropped_scores[i][0:img_innerbottom,0:img_innerright]
+                    score[innerbottom:bottom,left:innerright]=(cropped_scores[i][img_innerbottom:cropheight,0:img_innerright]/2)+score[innerbottom:bottom,left:innerright]
+                    score[top:innerbottom,innerright:right]=(cropped_scores[i][0:img_innerbottom,img_innerright:cropwidth]/2)+score[top:innerbottom,innerright:right]
+                    score[innerbottom:bottom,innerright:right]=(cropped_scores[i][img_innerbottom:cropheight,img_innerright:cropwidth]/4)+score[innerbottom:bottom,innerright:right]
+                elif w==0 and 0<h<stepsh-1:
+                    score[top:innertop,left:innerright]=(cropped_scores[i][0:img_innertop,0:img_innerright]/2)+score[top:innertop,left:innerright]               
+                    score[top:innertop,innerright:right]=(cropped_scores[i][0:img_innertop,img_innerright:cropwidth]/4)+score[top:innertop,innerright:right]
+                    score[innertop:innerbottom,left:innerright]=cropped_scores[i][img_innertop:img_innerbottom,0:img_innerright]
+                    score[innertop:innerbottom,innerright:right]=(cropped_scores[i][img_innertop:img_innerbottom,img_innerright:cropwidth]/2)+score[innertop:innerbottom,innerright:right]
+                    score[innerbottom:bottom,left:innerright]=(cropped_scores[i][img_innerbottom:cropheight,0:img_innerright]/2)+score[innerbottom:bottom,left:innerright]
+                    score[innerbottom:bottom,innerright:right]=(cropped_scores[i][img_innerbottom:cropheight,img_innerright:cropwidth]/4)+score[innerbottom:bottom,innerright:right]                    
+                elif w==0 and h==stepsh-1:
+                    score[top:innertop,left:innerright]=(cropped_scores[i][0:img_innertop,0:img_innerright]/2)+score[top:innertop,left:innerright]
+                    score[top:innertop,innerright:right]=(cropped_scores[i][0:img_innertop,img_innerright:cropwidth]/4)+score[top:innertop,innerright:right]
+                    score[innertop:bottom,left:innerright]=cropped_scores[i][img_innertop:cropheight,0:img_innerright]
+                    score[innertop:bottom,innerright:right]=(cropped_scores[i][img_innertop:cropheight,img_innerright:cropwidth]/2)+score[innertop:bottom,innerright:right]
+                elif 0<w<stepsw-1 and h==0:
+                    score[top:innerbottom,left:innerleft]=(cropped_scores[i][0:img_innerbottom,0:img_innerleft]/2)+score[top:innerbottom,left:innerleft]
+                    score[top:innerbottom,innerleft:innerright]=cropped_scores[i][0:img_innerbottom,img_innerleft:img_innerright]
+                    score[top:innerbottom,innerright:right]=(cropped_scores[i][0:img_innerbottom,img_innerright:cropwidth]/2)+score[top:innerbottom,innerright:right]
+                    score[innerbottom:bottom,left:innerleft]=(cropped_scores[i][img_innerbottom:cropheight,0:img_innerleft]/4)+score[innerbottom:bottom,left:innerleft]
+                    score[innerbottom:bottom,innerleft:innerright]=(cropped_scores[i][img_innerbottom:cropheight,img_innerleft:img_innerright]/4)+score[innerbottom:bottom,innerleft:innerright]
+                    score[innerbottom:bottom,innerright:right]=(cropped_scores[i][img_innerbottom:cropheight,img_innerright:cropwidth]/4)+score[innerbottom:bottom,innerright:right]  
+                elif 0<w<stepsw-1 and 0<h<stepsh-1:
+                    score[top:innertop,left:innerleft]=(cropped_scores[i][0:img_innertop,0:img_innerleft]/4)+ score[top:innertop,left:innerleft]
+                    score[top:innertop,innerleft:innerright]=(cropped_scores[i][0:img_innertop,img_innerleft:img_innerright]/2)+ score[top:innertop,innerleft:innerright]
+                    score[top:innertop,innerright:right]=(cropped_scores[i][0:img_innertop,img_innerright:cropwidth]/4)+score[top:innertop,innerright:right]
+                    score[innertop:innerbottom,left:innerleft]=(cropped_scores[i][img_innertop:img_innerbottom,0:img_innerleft]/2)+score[innertop:innerbottom,left:innerleft]
+                    score[innertop:innerbottom,innerleft:innerright]=cropped_scores[i][img_innertop:img_innerbottom,img_innerleft:img_innerright]
+                    score[innertop:innerbottom,innerright:right]=(cropped_scores[i][img_innertop:img_innerbottom,img_innerright:cropwidth]/2)+score[innertop:innerbottom,innerright:right]
+                    score[innerbottom:bottom,left:innerleft]=(cropped_scores[i][img_innerbottom:cropheight,0:img_innerleft]/4)+score[innerbottom:bottom,left:innerleft]
+                    score[innerbottom:bottom,innerleft:innerright]=(cropped_scores[i][img_innerbottom:cropheight,img_innerleft:img_innerright]/2)+score[innerbottom:bottom,innerleft:innerright]
+                    score[innerbottom:bottom,innerright:right]=(cropped_scores[i][img_innerbottom:cropheight,img_innerright:cropwidth]/4)+score[innerbottom:bottom,innerright:right]
+                elif 0<w<stepsw-1 and h==stepsh-1:
+                    score[top:innertop,left:innerleft]=(cropped_scores[i][0:img_innertop,0:img_innerleft]/4)+ score[top:innertop,left:innerleft]
+                    score[top:innertop,innerleft:innerright]=(cropped_scores[i][0:img_innertop,img_innerleft:img_innerright]/2)+ score[top:innertop,innerleft:innerright]
+                    score[top:innertop,innerright:right]=(cropped_scores[i][0:img_innertop,img_innerright:cropwidth]/4)+score[top:innertop,innerright:right]
+                    score[innertop:bottom,left:innerleft]=(cropped_scores[i][img_innertop:cropheight,0:img_innerleft]/2)+score[innertop:bottom,left:innerleft]
+                    score[innertop:bottom,innerleft:innerright]=cropped_scores[i][img_innertop:cropheight,img_innerleft:img_innerright]
+                    score[innertop:bottom,innerright:right]=(cropped_scores[i][img_innertop:cropheight,img_innerright:cropwidth]/2)+score[innertop:bottom,innerright:right]
+                elif w==stepsw-1 and h==0:
+                    score[top:innerbottom,left:innerleft]=(cropped_scores[i][0:img_innerbottom,0:img_innerleft]/2)+score[top:innerbottom,left:innerleft]
+                    score[innerbottom:bottom,left:innerleft]=(cropped_scores[i][img_innerbottom:cropheight,0:img_innerleft]/4)+score[innerbottom:bottom,left:innerleft]
+                    score[top:innerbottom,innerleft:right]=cropped_scores[i][0:img_innerbottom,img_innerleft:cropwidth]
+                    score[innerbottom:bottom,innerleft:right]=(cropped_scores[i][img_innerbottom:cropheight,img_innerleft:cropwidth]/2)+score[innerbottom:bottom,innerleft:right]
+                elif w==stepsw-1 and 0<h<stepsh-1:
+                    score[top:innertop,left:innerleft]=(cropped_scores[i][0:img_innertop,0:img_innerleft]/4)+ score[top:innertop,left:innerleft]
+                    score[top:innertop,innerleft:right]=(cropped_scores[i][0:img_innertop,img_innerleft:cropwidth]/2)+score[top:innertop,innerleft:right]
+                    score[innertop:innerbottom,left:innerleft]=(cropped_scores[i][img_innertop:img_innerbottom,0:img_innerleft]/2)+score[innertop:innerbottom,left:innerleft]
+                    score[innertop:innerbottom,innerleft:right]=cropped_scores[i][img_innertop:img_innerbottom,img_innerleft:cropwidth]
+                    score[innerbottom:bottom,left:innerleft]=(cropped_scores[i][img_innerbottom:cropheight,0:img_innerleft]/4)+score[innerbottom:bottom,left:innerleft]
+                    score[innerbottom:bottom,innerleft:right]=(cropped_scores[i][img_innerbottom:cropheight,img_innerleft:cropwidth]/2)+score[innerbottom:bottom,innerleft:right]
+                elif w==stepsw-1 and h==stepsh-1:
+                    score[top:innertop,left:innerleft]=(cropped_scores[i][0:img_innertop,0:img_innerleft]/4)+ score[top:innertop,left:innerleft]
+                    score[top:innertop,innerleft:right]=(cropped_scores[i][0:img_innertop,img_innerleft:cropwidth]/2)+score[top:innertop,innerleft:right]
+                    score[innertop:bottom,left:innerleft]=(cropped_scores[i][img_innertop:cropheight,0:img_innerleft]/2)+score[innertop:bottom,left:innerleft]
+                    score[innertop:bottom,innerleft:right]=cropped_scores[i][img_innertop:cropheight,img_innerleft:cropwidth]
             i+=1
     return gaussian_filter(score, sigma=4)
 

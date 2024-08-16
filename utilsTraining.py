@@ -139,7 +139,6 @@ def loadDataset(trainer):
         train_dataset, [train_num, valid_num]
     )
 
-    #writer.add_image("test",train_dataset.__getitem__(0).get("imageBase"))
                                                                   #kwargs=num_workers etc dependent on gpu available or not
     trainer.train_loader=torch.utils.data.DataLoader(train_data, batch_size=trainer.batch_size, shuffle=True, **kwargs) 
     
@@ -162,7 +161,6 @@ def infer(trainer, img):
         embed=trainer.bn(features_t)
         features_s=trainer.student(embed)
     if (trainer.distillType=="dbfad"):
-        #writer.add_graph(trainer.teacher,img)
         features_t = trainer.teacher(img)
         features_t = [F.max_pool2d(features_t[0],kernel_size=3,stride=2,padding=1),features_t[1],features_t[2],features_t[3]]
         features_s=trainer.student(features_t)
@@ -186,9 +184,9 @@ def computeAUROC(scores,gt_list,obj,name="base"):
     
     _1,_2,ths=computeROCcurve(gt_list,img_scores)
     
-    writer.add_pr_curve("Precision Recall Curve "+obj,np.array(gt_list[:,0]),np.array(img_scores),None,100)
+    #writer.add_pr_curve("Precision Recall Curve "+obj,np.array(gt_list[:,0]),np.array(img_scores),None,100)
     roc_curve=RocCurveDisplay.from_predictions(np.array(gt_list[:,0]),np.array(img_scores)).figure_
-    writer.add_figure("ROC curve "+obj,roc_curve)
+    #writer.add_figure("ROC curve "+obj,roc_curve)
     for i in range(10):
         metric=BinaryConfusionMatrix(threshold=0.1*i)
         metric.update(torch.tensor(img_scores),torch.tensor(gt_list[:,0]))
