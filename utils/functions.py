@@ -69,6 +69,13 @@ def write_in_csv(csv_path,line_array):
         #filewriter.writerow(['Derek', 'Software Developer'])
         filewriter.writerow(line_array)
 
+def get_mp_classification(score,pthreshold):
+    anomaly_score=score.max(axis=1).max()
+    if pthreshold<anomaly_score:
+        return 1,"anomaly", anomaly_score
+    else:
+        return 0,"good",anomaly_score
+
 def get_classification(score_bw,area_threshold):
     '''
     returns 1,"anomaly" for anomaly
@@ -142,8 +149,11 @@ def concat_hm(torch_img,cropped_scores,croppingfactor,overlapfactor):
     overlapwidth=int(cropwidth*overlapfactor)
     w_rest=(width-cropwidth)%(cropwidth-overlapwidth)
     h_rest=(height-cropheight)%(cropheight-overlapheight)
+
     height=height-h_rest
     width=width-w_rest
+    #print(width,cropwidth,overlapfactor,overlapwidth,w_rest)
+    #sys.exit()
     stepsh=int((height-cropheight)/(cropheight-overlapheight)+1)
     stepsw=int((width-cropwidth)/(cropwidth-overlapwidth)+1)
     score=np.zeros((cropheight*croppingfactor,cropwidth*croppingfactor))
@@ -163,7 +173,7 @@ def concat_hm(torch_img,cropped_scores,croppingfactor,overlapfactor):
             innerleft=w*(cropwidth-overlapwidth)+overlapwidth
             innerright=(w+1)*(cropwidth-overlapwidth)
             innerbottom=(h+1)*(cropheight-overlapheight)
-            overlaymethod="average"
+            overlaymethod="max"
             if overlaymethod=="max":
                 score[top:bottom,left:right]=np.maximum(cropped_scores[i],score[top:bottom,left:right])
             elif overlaymethod=="min":
@@ -304,7 +314,8 @@ def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendin
     im_hm11=axarr[2][1].imshow(score_bw) #, interpolation='nearest', cmap='viridis',vmin=0.0001,vmax=0.0002)
     im_hm12=axarr[1][1].imshow(score_bw_norm, interpolation='nearest', cmap='viridis',vmin=0,vmax=1)
     #f.colorbar(im_hm2,location="right")
-    prediction,pred_str,num_anomalypixel=get_classification(score_bw,area_th)
+    #prediction,pred_str,num_anomalypixel=get_classification(score_bw,area_th)
+    prediction,pred_str,num_anomalypixel=get_mp_classification(score,th)
     actual_str=("anomaly" if label.cpu().numpy()[0][0]==1 else "good")
     hm_dir=get_hm_dir(hm_dir_basis,hm_sorting,prediction,label.cpu().numpy()[0][0])
     plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'.png')
@@ -312,6 +323,7 @@ def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendin
     #threshold bw; actual class; prediction; num zero pixel; num not zero pixel
     write_in_csv(csv_path,csv_arr)
     plt.close(f)
+    return num_anomalypixel
 
 def generate_result_path(trainer):
     test_timestamp=str(datetime.now().hour)+"_"+str(datetime.now().minute)

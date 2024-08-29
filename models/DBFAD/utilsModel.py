@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from typing import Callable, Optional
+import sys
 
 
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, padding: int = 1) -> nn.Conv2d:
@@ -49,8 +50,8 @@ class conv1BnRelu(nn.Module):
         x = self.bn(x)
         return x
 
-#Attention Block used in the Attention module which is used as distillation connection
-#Attention2 is the same but only with two convolution layer
+#Attention Block used in the Attention module which is used as distillation connection (stride 1 1x1 convolutions)
+#chj: i think it does not make any sense to do two or more consecutive 1x1 convolution with relu activation function because it can be reducet to just one 1x1 conv + relu
 class Attention(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, padding=0):
         super(Attention, self).__init__()
@@ -69,9 +70,42 @@ class Attention(nn.Module):
 
         x3 = self.conv3(x2)
         x3 = self.softmax(x3)
+        #print(x.shape,x1.shape,x2.shape,x3.shape)
+        #sys.exit()
         #print("attention",(x3*x1).shape)
         return x3 * x1
 
+class AttentionMinus1(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1, padding=0):
+        super(AttentionMinus1, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels,
+                               kernel_size=1, stride=stride, padding=padding)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=1)
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        x1 = self.conv1(x)
+        x1 = F.relu(x1)
+
+
+
+        x2 = self.conv2(x1)
+        x2 = self.softmax(x2)
+        #print("attentionminusone",x1.shape,x2.shape)
+        return x2 * x1
+
+class Attention1(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(Attention1, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels,kernel_size=3, padding=1)
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        x1 = self.conv1(x)
+        x1 = self.softmax(x1)
+        #print("attention1",x1.shape,x.shape)
+        #sys.exit()
+        return x1*x
 
 class Attention2(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -86,7 +120,8 @@ class Attention2(nn.Module):
 
         x2 = self.conv2(x1)
         x2 = self.softmax(x2)
-        #print("attention2",x2.shape,x1.shape)
+        #print("attention2",x2.shape,x1.shape,x.shape)
+        #sys.exit()
         return x2 * x1
     
 class Attention3(nn.Module):

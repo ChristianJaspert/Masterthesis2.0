@@ -10,6 +10,7 @@ from models.EfficientAD.common import get_pdn_medium,get_pdn_small
 from models.ReverseDistillation.rd import loadBottleNeckRD, loadStudentRD
 from models.DBFAD.reverseResidual import reverse_student18
 from torcheval.metrics import BinaryConfusionMatrix
+from torchvision import datasets, transforms
 import sys
 from PIL import Image
 import numpy as np
@@ -34,10 +35,13 @@ def getParams(trainer,data,device):
     trainer.batch_size = data['TrainingData']['batch_size'] 
     trainer.myworkswitch=data['myworkswitch'] 
     trainer.myworklabel=data['myworklabel']
+    trainer.augmentation=data['augmentation']
     if data['myworkswitch']:
         trainer.save_path = data['save_path_modified_architecture']+"/"+data['myworklabel']
     else: 
+        trainer.augmentation=False
         trainer.save_path = data['save_path']
+    trainer.write=data['write']
     trainer.hm_sorting=data['hm_sorting']
     trainer.blendfactor=data['blendfactor']
     trainer.model_dir = trainer.save_path+ "/models" + "/" + trainer.obj  
@@ -130,7 +134,8 @@ def loadDataset(trainer):
         crop_size=[trainer.img_cropsize,trainer.img_cropsize],
         phase='train',
         croppingfactor=None,
-        cropping=False
+        cropping=False,
+        augmentation=trainer.augmentation
     )
     img_nums = len(train_dataset)
     valid_num = int(img_nums * trainer.validation_ratio)
@@ -144,6 +149,34 @@ def loadDataset(trainer):
     
     trainer.val_loader=torch.utils.data.DataLoader(val_data, batch_size=8, shuffle=False, **kwargs)
     #return train_data,val_data
+
+# def get_random_transforms():
+#     augmentative_transforms = []
+#     if c.transf_rotations:
+#         augmentative_transforms += [transforms.RandomRotation(180)]
+#     if c.transf_brightness > 0.0 or c.transf_contrast > 0.0 or c.transf_saturation > 0.0:
+#         augmentative_transforms += [transforms.ColorJitter(brightness=c.transf_brightness, contrast=c.transf_contrast,
+#                                                            saturation=c.transf_saturation)]
+
+#     tfs = [transforms.Resize(c.img_size)] + augmentative_transforms + [transforms.ToTensor(),
+#                                                                        transforms.Normalize(c.norm_mean, c.norm_std)]
+
+#     transform_train = transforms.Compose(tfs)
+#     return transform_train
+
+
+# def get_fixed_transforms(degrees):
+#     cust_rot = lambda x: rotate(x, degrees, False, False, None)
+#     augmentative_transforms = [cust_rot]
+#     if c.transf_brightness > 0.0 or c.transf_contrast > 0.0 or c.transf_saturation > 0.0:
+#         augmentative_transforms += [
+#             transforms.ColorJitter(brightness=c.transf_brightness, contrast=c.transf_contrast,
+#                                    saturation=c.transf_saturation)]
+#     tfs = [transforms.Resize(c.img_size)] + augmentative_transforms + [transforms.ToTensor(),
+#                                                                        transforms.Normalize(c.norm_mean,
+#                                                                                             c.norm_std)]
+#     return transforms.Compose(tfs)
+
     
 def infer(trainer, img):
     #print("infer")
@@ -174,19 +207,23 @@ def infer(trainer, img):
         features_t=list(features_t)+list(features_t2)
     return features_s,features_t
 
-def computeAUROC(scores,gt_list,obj,name="base"):
+def computeAUROC(trainer,scores,gt_list,obj,name="base"):
     max_anomaly_score = scores.max()
     min_anomaly_score = scores.min()
     scores = (scores - min_anomaly_score) / (max_anomaly_score - min_anomaly_score)
-    img_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
+    img_scores_tmp = scores.reshape(scores.shape[0], -1)
+    img_scores=img_scores_tmp.max(axis=1)
+    
     img_roc_auc = roc_auc_score(gt_list, img_scores)
     print(obj + " image"+str(name)+" ROCAUC: %.3f" % (img_roc_auc))
     
     _1,_2,ths=computeROCcurve(gt_list,img_scores)
-    
-    #writer.add_pr_curve("Precision Recall Curve "+obj,np.array(gt_list[:,0]),np.array(img_scores),None,100)
     roc_curve=RocCurveDisplay.from_predictions(np.array(gt_list[:,0]),np.array(img_scores)).figure_
-    #writer.add_figure("ROC curve "+obj,roc_curve)
+
+    if trainer.write:
+        writer.add_pr_curve("Precision Recall Curve "+obj,np.array(gt_list[:,0]),np.array(img_scores),None,100)
+        writer.add_figure("ROC curve "+obj,roc_curve)
+
     for i in range(10):
         metric=BinaryConfusionMatrix(threshold=0.1*i)
         metric.update(torch.tensor(img_scores),torch.tensor(gt_list[:,0]))

@@ -1,12 +1,14 @@
 import os
 import sys
+from pympler import asizeof
 from PIL import Image
 import cv2
 from matplotlib import pyplot as plt
 import time
-from datetime import timedelta
+from datetime import timedelta,datetime
 import numpy as np
 import torch
+
 from tqdm import tqdm
 from datasets.mvtec import MVTecDataset
 from utils.util import  AverageMeter,readYamlConfig,set_seed,convert_secs2time
@@ -14,7 +16,7 @@ from utils.functions import (
     cal_loss,
     cal_anomaly_maps,
     #th_img,
-    #write_in_csv,
+    write_in_csv,
     #get_classification,
     crop_torch_img,
     #img_transposetorch2nparr,
@@ -107,8 +109,11 @@ class NetTrainer:
             loss_epoch=0
             i=0
             for sample in self.train_loader:
+                
+
                 i=i+1
                 image = sample['imageBase'].to(self.device)
+                
                 self.optimizer.zero_grad()
                 with torch.set_grad_enabled(True):
 
@@ -119,10 +124,13 @@ class NetTrainer:
                     loss.backward()
                     self.optimizer.step()
                     self.scheduler.step()
+                #print(asizeof.asizeof(self.optimizer.step()))
+                #print(trainer.device)
+                #print(torch.cuda.memory_summary(trainer.device))
                 epoch_bar.set_postfix({"Loss": loss.item(),"e":_,"i":i,"tni":len(self.train_loader),"EpTav":convert_secs2time(epoch_time.avg)}) #,"Time/epoch":convert_secs2time(etime)})
                 epoch_bar.update()
                 #0print(loss_epoch.item())
-            writer.add_scalar('training loss '+str(self.obj)+"-"+self.myworklabel,loss_epoch,_)
+            #writer.add_scalar('training loss '+str(self.obj)+"-"+self.myworklabel,loss_epoch,_)
                
             
             val_loss = self.val(epoch_bar)
@@ -132,8 +140,8 @@ class NetTrainer:
             elif val_loss < best_score:
                 best_score = val_loss
                 self.save_checkpoint()
-            
-            writer.add_scalars('losses lr: '+str(self.obj)+"-"+self.myworklabel+": "+str(self.lr),{'training loss':loss_epoch.item(),'validation loss':val_loss},_)
+            if self.write:
+                writer.add_scalars('losses lr: '+str(self.obj)+"-"+self.myworklabel+": "+str(self.lr),{'training loss':loss_epoch.item(),'validation loss':val_loss},_)
             losslist.append([loss_epoch.item(),val_loss])
             epoch_time.update(time.time() - start_time)
             #print("epoch time",convert_secs2time(epoch_time.val))
@@ -188,34 +196,43 @@ class NetTrainer:
 
         
         kwargs = ({"num_workers": 1, "pin_memory": True} if torch.cuda.is_available() else {} )
-        if self.cropping:
-            test_path=self.data_path+"/"+self.obj+"/test/not_cropped/"
+        if self.obj=="carpet":
+            test_path=self.data_path+"/"+self.obj+"/test/"
+            self.cropping=False
         else:
-            test_path=self.data_path+"/"+self.obj+"/test/cropped/"
+            if self.cropping:
+                test_path=self.data_path+"/"+self.obj+"/test/not_cropped/"
+            else:
+                test_path=self.data_path+"/"+self.obj+"/test/cropped/"
+        
         test_dataset = MVTecDataset(
             root_dir=test_path,
             resize_shape=[self.img_resize_h,self.img_resize_w],
             crop_size=[self.img_cropsize,self.img_cropsize],
             phase='test',
-            croppingfactor=trainer.croppingfactor,
-            cropping=trainer.cropping
+            croppingfactor=self.croppingfactor,
+            cropping=self.cropping
         )
+
         tag="idx: "+str(test_dataset.__getitem__(0).get("idx"))+"  has anomaly: "+str(test_dataset.__getitem__(0).get("has_anomaly"))+"  filename: "+str(test_dataset.__getitem__(0).get("file_name"))
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, **kwargs)
         progressBar = tqdm(test_loader)
         
         
         scores = []
-        gt_list = []
+        gt_list = [] #ground truth labels
         #y_true=[]
         hm_dir_basis,csv_path,test_timestamp=generate_result_path(self)
+        pred_scores=[]
+        minpositive=1
+        maxnegative=0
         for sample in test_loader:
             
             label=sample['has_anomaly']
             #y_true.append(label.cpu().numpy()[0][0])
             image = sample['imageBase'].to(self.device)
             gt_list.extend(label.cpu().numpy())
-            concat_prediction=0
+            
             
             with torch.set_grad_enabled(False):
                 if trainer.cropping:
@@ -236,21 +253,47 @@ class NetTrainer:
                     features_s, features_t = infer(self,image)  
                     score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,trainer.norm)
 
-                  
-            save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,th,area_th,self.blendfactor)
-               
-            
+            th=0.0003
+            predscore=save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,th,area_th,self.blendfactor)
+            pred_scores.append(predscore)
+            predictioncsvarr=[predscore,label.cpu().numpy()[0][0],self.param_str,self.obj,str(datetime.now().hour)+"_"+str(datetime.now().minute)]
+            write_in_csv(trainer.save_path+'/logs/predictions.csv',predictioncsvarr)
+            if label.cpu().numpy()==1:
+                if minpositive>predscore:
+                    minpositive=predscore
+            else:
+                if maxnegative<predscore:
+                    maxnegative=predscore
 
             progressBar.update() 
+            #print(score.shape)
             scores.append(score)
 
         progressBar.close()
+        print(minpositive,maxnegative)
+        #thprediction_array=np.asarray([pred_scores,gt_list[:,0]]) #.transpose(1,0)
+        #write_in_csv("/home/christianjaspert/masterthesis/DistillationAD/thprediction_array.csv",thprediction_array)
         scores = np.asarray(scores)
         gt_list = np.asarray(gt_list)
+        pred_scores=np.array(pred_scores)
+        groundtruth=np.array(gt_list[:,0])
+        #for i in range(len(pred_scores)):
+            #print(pred_scores[i],groundtruth[i])
 
 
-        img_roc_auc,y_score,optmatrix,th=computeAUROC(scores,gt_list,self.obj+"-"+self.myworklabel," "+self.distillType)
+        img_roc_auc,y_score,optmatrix,th=computeAUROC(self,scores,gt_list,self.obj+("-"+self.myworklabel if self.myworkswitch else "")," "+self.distillType)
         save_log_csv(self,optmatrix,th,test_timestamp,img_roc_auc)
+        
+        if trainer.cropping:
+            area_th=20000
+        else:
+            area_th=100
+        
+        s=0  
+        for sample in test_loader:
+            score=scores[s]
+            save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,th,area_th,self.blendfactor)
+            s+=1
         
         #confusion matrix:
         #              predicted
@@ -273,46 +316,46 @@ if __name__ == "__main__":
     elif data['phase'] == "test":
         trainer = NetTrainer(data,device,False,None)
         trainer.test()
-    elif data['phase'] == "statistics_epochs":
+    # elif data['phase'] == "statistics_epochs":
         
-        lrlist=[]
-        epmax=100
-        for epochs in [1,5,10,20,30,50,100]:
-            trainer = NetTrainer(data,device,epochs)
-            mylist=trainer.train()
-            for i in range(epmax+1-len(mylist)):
-                if len(mylist)<epmax+1:
-                    mylist.append([0,0])
-            #print(mylist)
-            lrlist.append(mylist)
+    #     lrlist=[]
+    #     epmax=100
+    #     for epochs in [1,5,10,20,30,50,100]:
+    #         trainer = NetTrainer(data,device,epochs)
+    #         mylist=trainer.train()
+    #         for i in range(epmax+1-len(mylist)):
+    #             if len(mylist)<epmax+1:
+    #                 mylist.append([0,0])
+    #         #print(mylist)
+    #         lrlist.append(mylist)
 
-        for _ in range(len(lrlist[len(lrlist)-1])):
-            writer.add_scalars('losses for different num_epochs '+str(data['obj']),{'tl e1':lrlist[0][_][0],
-                                                                      'vl e1':lrlist[0][_][1],
-                                                                      'tl e5':lrlist[1][_][0],
-                                                                      'vl e5':lrlist[1][_][1],
-                                                                      'tl e10':lrlist[2][_][0],
-                                                                      'vl e10':lrlist[2][_][1],
-                                                                      'tl e20':lrlist[3][_][0],
-                                                                      'vl e20':lrlist[3][_][1],
-                                                                      'tl e30':lrlist[4][_][0],
-                                                                      'vl e30':lrlist[4][_][1],
-                                                                      'tl e50':lrlist[5][_][0],
-                                                                      'vl e50':lrlist[5][_][1],
-                                                                      'tl e100':lrlist[6][_][0],
-                                                                      'vl e100':lrlist[6][_][1],
-                                                                      },_+1)
-    elif data['phase']=="statistic_datasets":
-        lrlist=[]
-        epmax=5
-        for dataset in [[]]:
-            trainer = NetTrainer(data,device,epochs)
-            mylist=trainer.train()
-            for i in range(epmax+1-len(mylist)):
-                if len(mylist)<epmax+1:
-                    mylist.append([0,0])
-            #print(mylist)
-            lrlist.append(mylist)
+    #     for _ in range(len(lrlist[len(lrlist)-1])):
+    #         writer.add_scalars('losses for different num_epochs '+str(data['obj']),{'tl e1':lrlist[0][_][0],
+    #                                                                   'vl e1':lrlist[0][_][1],
+    #                                                                   'tl e5':lrlist[1][_][0],
+    #                                                                   'vl e5':lrlist[1][_][1],
+    #                                                                   'tl e10':lrlist[2][_][0],
+    #                                                                   'vl e10':lrlist[2][_][1],
+    #                                                                   'tl e20':lrlist[3][_][0],
+    #                                                                   'vl e20':lrlist[3][_][1],
+    #                                                                   'tl e30':lrlist[4][_][0],
+    #                                                                   'vl e30':lrlist[4][_][1],
+    #                                                                   'tl e50':lrlist[5][_][0],
+    #                                                                   'vl e50':lrlist[5][_][1],
+    #                                                                   'tl e100':lrlist[6][_][0],
+    #                                                                   'vl e100':lrlist[6][_][1],
+    #                                                                   },_+1)
+    # elif data['phase']=="statistic_datasets":
+        # lrlist=[]
+        # epmax=5
+        # for dataset in [[]]:
+        #     trainer = NetTrainer(data,device,epochs)
+        #     mylist=trainer.train()
+        #     for i in range(epmax+1-len(mylist)):
+        #         if len(mylist)<epmax+1:
+        #             mylist.append([0,0])
+        #     #print(mylist)
+        #     lrlist.append(mylist)
         
     
     else:

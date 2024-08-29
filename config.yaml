@@ -3,24 +3,29 @@ distillType: dbfad #st #st #dbfad # rd,ead, st
 backbone: resnet18 # any cnn model for, any resnet or wide resnet for rd, medium or small for ead
 out_indice: [2,3] # for st
 
-myworklabel: "Attention1"
-myworkswitch: False
+myworklabel: "xMVTEC_Attention1"
+myworkswitch: False #set to False for original code
+write: False
+attentionlayer: 1 #1,2,3,4,5,6,7 original code: 2
+distillationlayer: 31 #-1,1,2,3,4,5,6,7,31 original code: 31
+augmentation: False #True original code: False
 
 #obj: myfabric_hm_anomalie
-obj: myfabric_dataset #w625 h337 not cropped test: w2500 h1350#
-#obj: carpet #carpet
+#obj: myfabric_dataset #w625 h337 not cropped test: w2500 h1350#
+obj: carpet
 #obj: fabric2cropped_png #w1250 h675
 debugparams: False
-phase: train
+phase: test
 save_path: "./results"
 save_path_modified_architecture: "./results_modified_architecture"
 hm_sorting: True
 blendfactor: 0.4
-cropping: True #False: uses the cropped tiny pictures in the test phase, True: uses the big pictures and crops them
+cropping: False #False: uses the cropped tiny pictures in the test phase, True: uses the big pictures and crops them
 croppingfactor: 4
-overlapfactor: 0.404
+overlapfactor: 0 #0.25 #0.40234375
 threshold: 0.0001
 TrainingData:
+  
   epochs: 50 #100
   batch_size: 4 #4
   lr: 0.0005 #0.0005

@@ -1,6 +1,6 @@
 import torch.nn as nn
 from torch.nn import ConvTranspose2d 
-from models.DBFAD.utilsModel import  conv3BnRelu, conv1BnRelu, Attention, Attention2,Attention3, Attention4, Attention5,Attention6,Attention7,BasicBlockDe
+from models.DBFAD.utilsModel import  conv3BnRelu, conv1BnRelu,BasicBlockDe, Attention,AttentionMinus1, Attention2,Attention1,Attention3, Attention4, Attention5,Attention6,Attention7
 from models.sspcab import SSPCAB
 import sys
 from utils.util import readYamlConfig
@@ -53,11 +53,43 @@ class ReverseStudent(nn.Module):
             conv1BnRelu(256, 512, stride=2, padding=0),
             SSPCAB(512)
         )
-        attentionswitch=False #data['myworkswitch']
+        attentionswitch=data['myworkswitch']
         if attentionswitch:
-            self.AttBlock = nn.Sequential(
-                #Attention2(512, 512)
-                Attention2(512, 512)
+            l=data['attentionlayer']
+            if l==1:
+                self.AttBlock = nn.Sequential(
+                    #Attention2(512, 512)
+                    Attention1(512, 512)
+            )
+            if l==2:
+                self.AttBlock = nn.Sequential(
+                    #Attention2(512, 512)
+                    Attention2(512, 512)
+            )
+            if l==3:
+                self.AttBlock = nn.Sequential(
+                    #Attention2(512, 512)
+                    Attention3(512, 512)
+            )
+            if l==4:
+                self.AttBlock = nn.Sequential(
+                    #Attention2(512, 512)
+                    Attention4(512, 512)
+            )
+            if l==5:
+                self.AttBlock = nn.Sequential(
+                    #Attention2(512, 512)
+                    Attention5(512, 512)
+            )
+            if l==6:
+                self.AttBlock = nn.Sequential(
+                    #Attention2(512, 512)
+                    Attention6(512, 512)
+            )
+            if l==7:
+                self.AttBlock = nn.Sequential(
+                    #Attention2(512, 512)
+                    Attention7(512, 512)
             )
         else:
             self.AttBlock = nn.Sequential(
@@ -67,11 +99,75 @@ class ReverseStudent(nn.Module):
         #}
 
         #Distillation residual layer between Teacher and student
-        distillswitch=data['myworkswitch']
+        distillswitch=False #data['myworkswitch']
         if distillswitch:
-            #l=4,5,6,7
-            l=5
-            if l==4:
+            #l=-1,1,2,3,4,5,6,7,31
+            l=data['distillationlayer']
+            if l==-1:
+                if not self.DG:
+                    self.residualLayer0_1 = nn.Sequential(
+                        conv3BnRelu(64, 64, stride=1, padding=1),
+                        AttentionMinus1(64, 64)
+                    )
+                    self.residualLayer1_2 = nn.Sequential(
+                        conv3BnRelu(64, 128, stride=1, padding=1),
+                        nn.AvgPool2d(kernel_size=2, stride=2),
+                        AttentionMinus1(128, 128)
+                    )
+                    self.residualLayer2_3 = nn.Sequential(
+                        conv3BnRelu(128, 256, stride=1, padding=1),
+                        nn.AvgPool2d(kernel_size=2, stride=2),
+                        AttentionMinus1(256, 256)
+                    )
+            elif l==1:
+                if not self.DG:
+                    self.residualLayer0_1 = nn.Sequential(
+                        conv3BnRelu(64, 64, stride=1, padding=1),
+                        Attention1(64, 64)
+                    )
+                    self.residualLayer1_2 = nn.Sequential(
+                        conv3BnRelu(64, 128, stride=1, padding=1),
+                        nn.AvgPool2d(kernel_size=2, stride=2),
+                        Attention1(128, 128)
+                    )
+                    self.residualLayer2_3 = nn.Sequential(
+                        conv3BnRelu(128, 256, stride=1, padding=1),
+                        nn.AvgPool2d(kernel_size=2, stride=2),
+                        Attention1(256, 256)
+                    )
+            elif l==2:
+                if not self.DG:
+                    self.residualLayer0_1 = nn.Sequential(
+                        conv3BnRelu(64, 64, stride=1, padding=1),
+                        Attention2(64, 64)
+                    )
+                    self.residualLayer1_2 = nn.Sequential(
+                        conv3BnRelu(64, 128, stride=1, padding=1),
+                        nn.AvgPool2d(kernel_size=2, stride=2),
+                        Attention2(128, 128)
+                    )
+                    self.residualLayer2_3 = nn.Sequential(
+                        conv3BnRelu(128, 256, stride=1, padding=1),
+                        nn.AvgPool2d(kernel_size=2, stride=2),
+                        Attention2(256, 256)
+                    )
+            elif l==3:
+                if not self.DG:
+                    self.residualLayer0_1 = nn.Sequential(
+                        conv3BnRelu(64, 64, stride=1, padding=1),
+                        Attention3(64, 64)
+                    )
+                    self.residualLayer1_2 = nn.Sequential(
+                        conv3BnRelu(64, 128, stride=1, padding=1),
+                        nn.AvgPool2d(kernel_size=2, stride=2),
+                        Attention3(128, 128)
+                    )
+                    self.residualLayer2_3 = nn.Sequential(
+                        conv3BnRelu(128, 256, stride=1, padding=1),
+                        nn.AvgPool2d(kernel_size=2, stride=2),
+                        Attention3(256, 256)
+                    )
+            elif l==4:
                 if not self.DG:
                     self.residualLayer0_1 = nn.Sequential(
                         conv3BnRelu(64, 64, stride=1, padding=1),
@@ -135,6 +231,21 @@ class ReverseStudent(nn.Module):
                         nn.AvgPool2d(kernel_size=2, stride=2),
                         Attention7(256, 256)
                     )
+            elif l==31:
+                self.residualLayer0_1 = nn.Sequential(
+                    conv3BnRelu(64, 64, stride=1, padding=1),
+                    Attention(64, 64)
+                )
+                self.residualLayer1_2 = nn.Sequential(
+                    conv3BnRelu(64, 128, stride=1, padding=1),
+                    nn.AvgPool2d(kernel_size=2, stride=2),
+                    Attention(128, 128)
+                )
+                self.residualLayer2_3 = nn.Sequential(
+                    conv3BnRelu(128, 256, stride=1, padding=1),
+                    nn.AvgPool2d(kernel_size=2, stride=2),
+                    Attention(256, 256)
+                )
         else:
             if not self.DG:
                 self.residualLayer0_1 = nn.Sequential(

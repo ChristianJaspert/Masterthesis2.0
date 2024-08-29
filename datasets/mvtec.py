@@ -1,7 +1,8 @@
 import os
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms as T
+#from torchvision import transforms as T
+from torchvision.transforms import v2 as T
 import cv2
 import numpy as np
 import glob
@@ -9,7 +10,7 @@ import sys
 
 class MVTecDataset(Dataset):
 
-    def __init__(self, root_dir, resize_shape=None,crop_size=None,phase="train",croppingfactor=4,cropping=True):
+    def __init__(self, root_dir, resize_shape=None,crop_size=None,phase="train",croppingfactor=4,cropping=True,augmentation=False):
         self.root_dir = root_dir
         self.croppingfactor=croppingfactor
         self.cropping=cropping
@@ -20,13 +21,23 @@ class MVTecDataset(Dataset):
 
         self.image_paths = sorted(glob.glob(root_dir+"/*.png"))
 
-        
+        self.augmentation=augmentation
 
         self.resize_shape=resize_shape
         if (crop_size==None):
             crop_size=min(resize_shape[0],resize_shape[1])
-        self.transform=T.Compose([T.CenterCrop(crop_size),T.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])])
+        #self.transform=T.Compose([T.CenterCrop(crop_size),T.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])])
         self.transform=T.Compose([T.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])])
+        self.trainingtransform=T.Compose([
+            #T.RandomHorizontalFlip(),
+            #T.RandomVerticalFlip(),
+            #T.RandomRotation(degrees=180),
+            #T.RandomAdjustSharpness(sharpness_factor=.5),
+            #T.RandomAffine(degrees=180),
+            #T.ColorJitter(brightness=.5,contrast=.4)
+            #T.RandomResize(min_size=10,max_size=100),
+            T.RandomResizedCrop(self.resize_shape)
+            ])
         self.phase=phase
         
     def __len__(self):
@@ -72,7 +83,13 @@ class MVTecDataset(Dataset):
             
             image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             image = np.transpose(image, (2, 0, 1))
-            image=np.asarray(self.transform(torch.from_numpy(image)))
+            image=self.transform(torch.from_numpy(image))
+            if self.augmentation:
+                #print("before",image)
+                image=self.trainingtransform(image)
+                #print("after",image)
+                #sys.exit()
+            image=np.asarray(image)
             #print("mvtec image",image.dtype)
         if self.phase=="test":
             return image   
