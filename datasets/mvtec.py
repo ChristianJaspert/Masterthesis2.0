@@ -29,14 +29,14 @@ class MVTecDataset(Dataset):
         #self.transform=T.Compose([T.CenterCrop(crop_size),T.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])])
         self.transform=T.Compose([T.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])])
         self.trainingtransform=T.Compose([
-            #T.RandomHorizontalFlip(),
+            T.RandomHorizontalFlip(),
             #T.RandomVerticalFlip(),
             #T.RandomRotation(degrees=180),
-            #T.RandomAdjustSharpness(sharpness_factor=.5),
-            #T.RandomAffine(degrees=180),
+            T.RandomAdjustSharpness(sharpness_factor=.5),
+            T.RandomAffine(degrees=180),
             #T.ColorJitter(brightness=.5,contrast=.4)
             #T.RandomResize(min_size=10,max_size=100),
-            T.RandomResizedCrop(self.resize_shape)
+            #T.RandomResizedCrop(self.resize_shape)
             ])
         self.phase=phase
         

@@ -2,6 +2,7 @@ import torch
 import sys
 from datetime import datetime
 import torch.nn.functional as F
+import torchvision.transforms.functional as TF
 from scipy.ndimage import gaussian_filter
 import cv2
 import csv
@@ -283,7 +284,7 @@ def get_hm_dir(hm_dir_basis,sorting,prediction,actual):
             os.mkdir(hm_dir)
     return hm_dir
 
-def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendingfactor):
+def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendingfactor,pmaxthreshold):
     image=sample['imageBase']
     label=sample["has_anomaly"]
     f, axarr = plt.subplots(3,2)
@@ -314,8 +315,8 @@ def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendin
     im_hm11=axarr[2][1].imshow(score_bw) #, interpolation='nearest', cmap='viridis',vmin=0.0001,vmax=0.0002)
     im_hm12=axarr[1][1].imshow(score_bw_norm, interpolation='nearest', cmap='viridis',vmin=0,vmax=1)
     #f.colorbar(im_hm2,location="right")
-    #prediction,pred_str,num_anomalypixel=get_classification(score_bw,area_th)
-    prediction,pred_str,num_anomalypixel=get_mp_classification(score,th)
+    hmprediction,hmpred_str,hmnum_anomalypixel=get_classification(score_bw,area_th)
+    prediction,pred_str,num_anomalypixel=get_mp_classification(score,pmaxthreshold)
     actual_str=("anomaly" if label.cpu().numpy()[0][0]==1 else "good")
     hm_dir=get_hm_dir(hm_dir_basis,hm_sorting,prediction,label.cpu().numpy()[0][0])
     plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'.png')
@@ -323,7 +324,7 @@ def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendin
     #threshold bw; actual class; prediction; num zero pixel; num not zero pixel
     write_in_csv(csv_path,csv_arr)
     plt.close(f)
-    return num_anomalypixel
+    return num_anomalypixel,hmnum_anomalypixel
 
 def generate_result_path(trainer):
     test_timestamp=str(datetime.now().hour)+"_"+str(datetime.now().minute)
@@ -345,6 +346,52 @@ def generate_result_path(trainer):
 
     return hm_dir_basis,csv_path,test_timestamp
         
+def augmented_scores(trainer, img_input): # -> List[np.array]:
+        score = trainer.score(img_input)
+        score_list = [score]
+
+        if trainer.rot_90:
+            rotated_90 = TF.rotate(img_input, -90)
+            rotated_90_score = trainer.score(rotated_90)
+            rotated_90_score = np.rot90(rotated_90_score)
+            score_list.append(rotated_90_score)
+        if trainer.rot_180:
+            rotated_180 = TF.rotate(img_input, -180)
+            rotated_180_score = trainer.score(rotated_180)
+            rotated_180_score = np.rot90(rotated_180_score, k=2)
+            score_list.append(rotated_180_score)
+        if trainer.rot_270:
+            rotated_270 = TF.rotate(img_input, -270)
+            rotated_270_score = trainer.score(rotated_270)
+            rotated_270_score = np.rot90(rotated_270_score, k=3)
+            score_list.append(rotated_270_score)
+        if trainer.h_flip:
+            horizontal_flip = torch.flip(img_input, dims=[3])
+            horizontal_flip_score = trainer.score(horizontal_flip)
+            horizontal_flip_score = np.fliplr(horizontal_flip_score)
+            score_list.append(horizontal_flip_score)
+        if trainer.h_flip_rot_90:
+            flipped_rotated_90 = TF.rotate(torch.flip(img_input, dims=[3]), -90)
+            flipped_rotated_90_score = trainer.score(flipped_rotated_90)
+            flipped_rotated_90_score = np.fliplr(np.rot90(flipped_rotated_90_score))
+            score_list.append(flipped_rotated_90_score)
+        if trainer.h_flip_rot_180:
+            flipped_rotated_180 = TF.rotate(torch.flip(img_input, dims=[3]), -180)
+            flipped_rotated_180_score = trainer.score(flipped_rotated_180)
+            flipped_rotated_180_score = np.fliplr(np.rot90(flipped_rotated_180_score, k=2))
+            score_list.append(flipped_rotated_180_score)
+        if trainer.h_flip_rot_270:
+            flipped_rotated_270 = TF.rotate(torch.flip(img_input, dims=[3]), -270)
+            flipped_rotated_270_score = trainer.score(flipped_rotated_270)
+            flipped_rotated_270_score = np.fliplr(np.rot90(flipped_rotated_270_score, k=3))
+            score_list.append(flipped_rotated_270_score)
+        return score_list
+
+def __mean_scores(self, score_list):
+    res = np.mean(score_list, axis=0)
+
+    return res
+
 def save_log_csv(trainer,confusionmatrix,th,test_timestamp,img_roc_auc):
     if not os.path.isdir(trainer.save_path+'/logs/'):
         os.mkdir(trainer.save_path+'/logs/')

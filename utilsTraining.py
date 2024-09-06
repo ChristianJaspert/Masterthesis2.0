@@ -58,6 +58,14 @@ def getParams(trainer,data,device):
     trainer.test_img_resize_h = data['TestData']['img_size_h']
     trainer.test_img_resize_w = data['TestData']['img_size_w']
     trainer.test_img_cropsize = data['TestData']['crop_size']
+    trainer.rot_90=data['AugmentScores']['rot_90']
+    trainer.rot_180=data['AugmentScores']['rot_180']
+    trainer.rot_270=data['AugmentScores']['rot_270']
+    trainer.h_flip=data['AugmentScores']['h_flip']
+    trainer.h_flip_rot_90=data['AugmentScores']['h_flip_rot_90']
+    trainer.h_flip_rot_180=data['AugmentScores']['h_flip_rot_180']
+    trainer.h_flip_rot_270=data['AugmentScores']['h_flip_rot_270']
+
     if data['debugparams']:
         trainer.obj = "fabric_not_cropped_DEBUGGING"
         trainer.num_epochs = 1
