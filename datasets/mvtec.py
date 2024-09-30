@@ -21,7 +21,7 @@ class MVTecDataset(Dataset):
 
         self.image_paths = sorted(glob.glob(root_dir+"/*.png"))
 
-        self.augmentation=augmentation
+        self.augmentation=False #augmentation
 
         self.resize_shape=resize_shape
         if (crop_size==None):

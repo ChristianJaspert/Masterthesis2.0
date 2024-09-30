@@ -9,6 +9,7 @@ import csv
 from PIL import Image
 import numpy as np
 from matplotlib import pyplot as plt
+import matplotlib as mpl
 import os
 
 def cal_loss(fs_list, ft_list,norm):
@@ -59,10 +60,6 @@ def th_img(img,threshold):
     return thresh
 
 def write_in_csv(csv_path,line_array):
-    '''
-    line array should have following format:
-    [filename, threshold, actual class, predicted class, number of zero pixel, number of anomaly pixel ]
-    '''
     with open(csv_path, 'a', newline='') as csvfile:
         filewriter = csv.writer(csvfile, delimiter=',',
                                 quotechar='|', quoting=csv.QUOTE_MINIMAL)
@@ -177,8 +174,6 @@ def concat_hm(torch_img,cropped_scores,croppingfactor,overlapfactor):
             overlaymethod="max"
             if overlaymethod=="max":
                 score[top:bottom,left:right]=np.maximum(cropped_scores[i],score[top:bottom,left:right])
-            elif overlaymethod=="min":
-                score[top:bottom,left:right]=np.minimum(cropped_scores[i],score[top:bottom,left:right])
             elif overlaymethod=="average":
 
                 if w==0 and h==0:
@@ -284,46 +279,123 @@ def get_hm_dir(hm_dir_basis,sorting,prediction,actual):
             os.mkdir(hm_dir)
     return hm_dir
 
+def tmp_save_hm_ensamble(score,filename):
+    path="/home/christianjaspert/masterthesis/thesis figures/augmented_Scores/"
+    normalized_hm = cv2.normalize(score, None, 0, 1, cv2.NORM_MINMAX)
+
+    colormap = plt.get_cmap('viridis')
+    normalized_hm_colored = colormap(normalized_hm)
+
+    normalized_hm_colored8 = (normalized_hm_colored[:, :, :3] * 255).astype(np.uint8)
+    plt.imshow(normalized_hm_colored8)#,vmin=0,vmax=0.0002)
+    if not os.path.isdir(path):
+            os.mkdir(path)
+    plt.savefig(path+filename)
+
 def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendingfactor,pmaxthreshold):
     image=sample['imageBase']
     label=sample["has_anomaly"]
-    f, axarr = plt.subplots(3,2)
     img=img_transposetorch2nparr(image.cpu().numpy()) #numpy image: (height,width,rgb)
     img=(cv2.normalize(img,None,0,1,cv2.NORM_MINMAX)*255).astype(np.uint8)
-    axarr[0][0].imshow(img)
     normalized_hm = cv2.normalize(score, None, 0, 1, cv2.NORM_MINMAX)
     
-    # Apply a colormap to the heatmap
-    colormap = plt.get_cmap('viridis')
-    normalized_hm_colored = colormap(normalized_hm)
-    
-    # Convert the heatmap to RGB
-    normalized_hm_colored8 = (normalized_hm_colored[:, :, :3] * 255).astype(np.uint8)
-    
-    # Overlay the heatmap on the image
-    overlay = cv2.addWeighted(normalized_hm_colored8,blendingfactor,img,1-blendingfactor,0)#img_transposetorch2nparr(image.cpu().numpy())*0.7#+heatmap_colored*0.3
-    im_hm01=axarr[0][1].imshow(overlay)
-    im_hm10=axarr[1][0].imshow(normalized_hm_colored8)
-    f.colorbar(im_hm10,location="left")
-    
-    im_hm20=axarr[2][0].imshow(score, interpolation='nearest', cmap='viridis',vmin=0.0001,vmax=0.0002)#,vmin=0,vmax=0.0002)
-    f.colorbar(im_hm20,location="left")
+
+
+
     
     score_bw=th_img(score,th)
-    score_bw_norm=th_img(normalized_hm,th)
+    #score_bw_norm=th_img(normalized_hm,th)
     
-    im_hm11=axarr[2][1].imshow(score_bw) #, interpolation='nearest', cmap='viridis',vmin=0.0001,vmax=0.0002)
-    im_hm12=axarr[1][1].imshow(score_bw_norm, interpolation='nearest', cmap='viridis',vmin=0,vmax=1)
-    #f.colorbar(im_hm2,location="right")
     hmprediction,hmpred_str,hmnum_anomalypixel=get_classification(score_bw,area_th)
     prediction,pred_str,num_anomalypixel=get_mp_classification(score,pmaxthreshold)
     actual_str=("anomaly" if label.cpu().numpy()[0][0]==1 else "good")
     hm_dir=get_hm_dir(hm_dir_basis,hm_sorting,prediction,label.cpu().numpy()[0][0])
-    plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'.png')
     csv_arr=[str(th),str(label.cpu().numpy()[0][0]),str(prediction),str((score_bw == 0).sum()),str((score_bw > 0).sum())]
     #threshold bw; actual class; prediction; num zero pixel; num not zero pixel
     write_in_csv(csv_path,csv_arr)
-    plt.close(f)
+    
+    # #create discrete colormap
+    # cmap = plt.cm.jet  # define the colormap
+    # # extract all colors from the .jet map
+    # cmaplist = [cmap(i) for i in range(cmap.N)]
+    # # force the first color entry to be grey
+    # cmaplist[0] = (.5, .5, .5, 1.0)
+
+    # # create the new map
+    # cmap = mpl.colors.LinearSegmentedColormap.from_list(
+    #     'Custom cmap', cmaplist, cmap.N)
+
+    # f, axarr = plt.subplots(3,2)
+    # axarr[0][0].imshow(img)
+    # im_hm01=axarr[0][1].imshow(overlay)
+    # im_hm10=axarr[1][0].imshow(normalized_hm_colored8)
+    # f.colorbar(im_hm10,location="left")
+    # im_hm20 = axarr[2][0].hist(vals, 255)  #.xlim([0,255])
+    # axarr[2][0].set_xlim([0,255])
+    # im_hm20=axarr[2][0].imshow(score, interpolation='nearest', cmap='viridis',vmin=0.0001,vmax=0.0002)#,vmin=0,vmax=0.0002)
+    # f.colorbar(im_hm20,location="left")
+    # im_hm21=axarr[2][1].imshow(score_bw) #, interpolation='nearest', cmap='viridis',vmin=0.0001,vmax=0.0002)
+    # im_hm21=axarr[2][1].contourf(normalized_hm)
+    # im_hm11=axarr[1][1].imshow(score_bw_norm, interpolation='nearest', cmap='viridis',vmin=0,vmax=1)
+    # plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'.png')
+    # plt.close(f)
+
+
+
+    
+    # hist_dir=hm_dir+"pixelhistograms/"
+    # if not os.path.isdir(hist_dir):
+    #         os.mkdir(hist_dir)
+    # contour_dir=hm_dir+"countourplots/"
+    # if not os.path.isdir(contour_dir):
+    #         os.mkdir(contour_dir)
+    # contour_hist_dir=hm_dir+"countourplotswithhistogram/"
+    # if not os.path.isdir(contour_hist_dir):
+    #         os.mkdir(contour_hist_dir)
+    
+    if True:
+            # Apply a colormap to the heatmap
+        colormap = plt.get_cmap('viridis')
+        normalized_hm_colored = colormap(normalized_hm)
+        
+        # Convert the heatmap to RGB
+        normalized_hm_colored8 = (normalized_hm_colored[:, :, :3] * 255).astype(np.uint8)
+        
+        # Overlay the heatmap on the image
+        overlay = cv2.addWeighted(normalized_hm_colored8,blendingfactor,img,1-blendingfactor,0)#img_transposetorch2nparr(image.cpu().numpy())*0.7#+heatmap_colored*0.3
+        vals = normalized_hm_colored8.mean(axis=2).flatten()
+        s,axarrs=plt.subplots(2,2)
+        #axarrs[0][0].imshow(img)
+        axarrs[0][0].imshow(overlay)
+
+        axarrs[0][1].imshow(normalized_hm)
+
+        axarrs[1][0].hist(vals, 255)  #.xlim([0,255])
+        axarrs[1][0].set_xlim([0,255])
+        axarrs[1][0].set_ylim([0,500])
+        #plt.savefig(hist_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_Pixelhistogram.png')
+        #print(type(normalized_hm))
+        contourp=axarrs[1][1].contourf(np.flip(normalized_hm,axis=0))
+        s.colorbar(contourp,location="right")
+        #s.set_size_inches(30,20)
+        plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_contourplot.png')
+        plt.close()
+
+
+
+    # plt.hist(vals, 255)  #.xlim([0,255])
+    # plt.xlim([0,255])
+    # plt.ylim([0,1000])
+    # plt.savefig(hist_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_Pixelhistogram.png')
+    # plt.close()
+    
+    # plt.contourf(normalized_hm)
+    # plt.colorbar(location="right")
+    # plt.savefig(contour_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_contourplot.png')
+    # plt.close()
+
+    #cv2.imwrite(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'overlay.png',overlay)
+    
     return num_anomalypixel,hmnum_anomalypixel
 
 def generate_result_path(trainer):
@@ -346,45 +418,55 @@ def generate_result_path(trainer):
 
     return hm_dir_basis,csv_path,test_timestamp
         
-def augmented_scores(trainer, img_input): # -> List[np.array]:
+def augmented_scores(trainer, img_input,sfn): # -> List[np.array]:
         score = trainer.score(img_input)
+        #tmp_save_hm_ensamble(score,sfn+"og_score.png")
         score_list = [score]
 
         if trainer.rot_90:
             rotated_90 = TF.rotate(img_input, -90)
             rotated_90_score = trainer.score(rotated_90)
+            #tmp_save_hm_ensamble(rotated_90_score,sfn+"rot_90_score.png")
             rotated_90_score = np.rot90(rotated_90_score)
             score_list.append(rotated_90_score)
         if trainer.rot_180:
             rotated_180 = TF.rotate(img_input, -180)
             rotated_180_score = trainer.score(rotated_180)
+            #tmp_save_hm_ensamble(rotated_180_score,sfn+"rot_1800_score.png")
             rotated_180_score = np.rot90(rotated_180_score, k=2)
             score_list.append(rotated_180_score)
         if trainer.rot_270:
             rotated_270 = TF.rotate(img_input, -270)
             rotated_270_score = trainer.score(rotated_270)
+            #tmp_save_hm_ensamble(rotated_270_score,sfn+"rot_270_score.png")
             rotated_270_score = np.rot90(rotated_270_score, k=3)
             score_list.append(rotated_270_score)
         if trainer.h_flip:
             horizontal_flip = torch.flip(img_input, dims=[3])
             horizontal_flip_score = trainer.score(horizontal_flip)
+            #tmp_save_hm_ensamble(horizontal_flip_score,sfn+"flip_score.png")
             horizontal_flip_score = np.fliplr(horizontal_flip_score)
             score_list.append(horizontal_flip_score)
         if trainer.h_flip_rot_90:
             flipped_rotated_90 = TF.rotate(torch.flip(img_input, dims=[3]), -90)
             flipped_rotated_90_score = trainer.score(flipped_rotated_90)
+            #tmp_save_hm_ensamble(flipped_rotated_90_score,sfn+"flipped_rot_90_score.png")
             flipped_rotated_90_score = np.fliplr(np.rot90(flipped_rotated_90_score))
             score_list.append(flipped_rotated_90_score)
         if trainer.h_flip_rot_180:
             flipped_rotated_180 = TF.rotate(torch.flip(img_input, dims=[3]), -180)
             flipped_rotated_180_score = trainer.score(flipped_rotated_180)
+            #tmp_save_hm_ensamble(flipped_rotated_180_score,sfn+"flipped_rot_180_score.png")
             flipped_rotated_180_score = np.fliplr(np.rot90(flipped_rotated_180_score, k=2))
             score_list.append(flipped_rotated_180_score)
         if trainer.h_flip_rot_270:
             flipped_rotated_270 = TF.rotate(torch.flip(img_input, dims=[3]), -270)
             flipped_rotated_270_score = trainer.score(flipped_rotated_270)
+            #tmp_save_hm_ensamble(flipped_rotated_270_score,sfn+"flipped_rot_270_score.png")
             flipped_rotated_270_score = np.fliplr(np.rot90(flipped_rotated_270_score, k=3))
             score_list.append(flipped_rotated_270_score)
+        #meanscore=np.mean(score_list, axis=0)
+        #tmp_save_hm_ensamble(meanscore,sfn+"meanscore.png")
         return score_list
 
 def __mean_scores(self, score_list):

@@ -3,12 +3,16 @@ distillType: dbfad #st #st #dbfad # rd,ead, st
 backbone: resnet18 # any cnn model for, any resnet or wide resnet for rd, medium or small for ead
 out_indice: [2,3] # for st
 
-myworklabel: myFabricCombined #"xMVTEC_combined"
+myworklabel: Attention4 #"xMVTEC_combined"
 myworkswitch: True #set to False for original code
-write: True
-attentionlayer: 1 #1,2,3,4,5,6,7 original code: 2
+distillationswitch: True
+attentionswitch: True
+write: False
+attentionlayer: 4 #1,2,3,4,5,6,7 original code: 2
 distillationlayer: 31 #-1,1,2,3,4,5,6,7,31 original code: 31
-augmentation: False #True original code: False
+augmentation: True #True original code: False  -  This switches the training data augmentation on(True) and off (False) 
+
+handmade: False
 
 #obj: myfabric_hm_anomalie
 obj: myfabric_dataset #w625 h337 not cropped test: w2500 h1350#
@@ -18,11 +22,11 @@ debugparams: False
 phase: test
 save_path: "./results"
 save_path_modified_architecture: "./results_modified_architecture"
-hm_sorting: True
+hm_sorting: True #hm: heatmap
 blendfactor: 0.4
 cropping: True #False: uses the cropped tiny pictures in the test phase, True: uses the big pictures and crops them
 croppingfactor: 4
-overlapfactor: 0.25 #0.25 #0.40234375
+overlapfactor: 0 #0.25 #0.40234375
 threshold: 0.0001
 TrainingData:
   
@@ -38,11 +42,30 @@ TestData:
   img_size_w: 256
   crop_size: 256
 
+# AugmentScores:
+#   rot_90: True
+#   rot_180: True
+#   rot_270: True
+#   h_flip: True
+#   h_flip_rot_90: True
+#   h_flip_rot_180: True
+#   h_flip_rot_270: True
+
+
+# AugmentScores:
+#   rot_90: True
+#   rot_180: True
+#   rot_270: True
+#   h_flip: False
+#   h_flip_rot_90: False
+#   h_flip_rot_180: False
+#   h_flip_rot_270: False
+
 AugmentScores:
-  rot_90: True
-  rot_180: True
-  rot_270: True
-  h_flip: True
-  h_flip_rot_90: True
-  h_flip_rot_180: True
-  h_flip_rot_270: True
+  rot_90: False
+  rot_180: False
+  rot_270: False
+  h_flip: False
+  h_flip_rot_90: False
+  h_flip_rot_180: False
+  h_flip_rot_270: False

@@ -14,6 +14,8 @@ from torchvision import datasets, transforms
 import sys
 from PIL import Image
 import numpy as np
+from utils.functions import write_in_csv
+
 from torch.utils.tensorboard import SummaryWriter
 writer=SummaryWriter("runs")
 
@@ -41,6 +43,7 @@ def getParams(trainer,data,device):
     else: 
         trainer.augmentation=False
         trainer.save_path = data['save_path']
+    trainer.handmade=data["handmade"]
     trainer.write=data['write']
     trainer.hm_sorting=data['hm_sorting']
     trainer.blendfactor=data['blendfactor']
@@ -220,14 +223,30 @@ def computeAUROC(trainer,scores,gt_list,obj,name="base"):
     min_anomaly_score = scores.min()
     scores = (scores - min_anomaly_score) / (max_anomaly_score - min_anomaly_score)
     img_scores_tmp = scores.reshape(scores.shape[0], -1)
+
+
+
     img_scores=img_scores_tmp.max(axis=1)
-    
     img_roc_auc = roc_auc_score(gt_list, img_scores)
     print(obj + " image"+str(name)+" ROCAUC: %.3f" % (img_roc_auc))
+
+    csvpath='/home/christianjaspert/masterthesis/DistillationAD/areaTHstatistics.csv'
+    for th in range(10):
+        img_scores_area=[]
+        for i in range(img_scores_tmp.shape[0]):
+            numanomalpixel=np.sum(img_scores_tmp[i]>th*0.02+0.1)
+            img_scores_area.append(numanomalpixel)
+            csvarray=[numanomalpixel,gt_list[i][0],th*0.02+0.1]
+            write_in_csv(csvpath,csvarray)
+        img_scores_area=np.asarray(img_scores_area)/len(img_scores_tmp[0])
+        img_roc_auc_area = roc_auc_score(gt_list, img_scores_area)
+    print(obj + " image"+str(name)+" AREA ROCAUC: %.3f" % (img_roc_auc_area))
     
+
+
+
     _1,_2,ths=computeROCcurve(gt_list,img_scores)
     roc_curve=RocCurveDisplay.from_predictions(np.array(gt_list[:,0]),np.array(img_scores)).figure_
-
     if trainer.write:
         writer.add_pr_curve("Precision Recall Curve "+obj,np.array(gt_list[:,0]),np.array(img_scores),None,100)
         writer.add_figure("ROC curve "+obj,roc_curve)

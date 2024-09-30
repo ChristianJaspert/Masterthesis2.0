@@ -1,6 +1,7 @@
 import torch.nn as nn
 from torch.nn import ConvTranspose2d 
 from models.DBFAD.utilsModel import  conv3BnRelu, conv1BnRelu,BasicBlockDe, Attention,AttentionMinus1, Attention2,Attention1,Attention3, Attention4, Attention5,Attention6,Attention7
+#from utilsModel import  conv3BnRelu, conv1BnRelu,BasicBlockDe, Attention,AttentionMinus1, Attention2,Attention1,Attention3, Attention4, Attention5,Attention6,Attention7
 from models.sspcab import SSPCAB
 import sys
 from utils.util import readYamlConfig
@@ -53,7 +54,7 @@ class ReverseStudent(nn.Module):
             conv1BnRelu(256, 512, stride=2, padding=0),
             SSPCAB(512)
         )
-        attentionswitch=data['myworkswitch']
+        attentionswitch=data['attentionswitch']
         if attentionswitch:
             l=data['attentionlayer']
             if l==1:
@@ -99,7 +100,7 @@ class ReverseStudent(nn.Module):
         #}
 
         #Distillation residual layer between Teacher and student
-        distillswitch=False #data['myworkswitch']
+        distillswitch=data['distillationswitch']
         if distillswitch:
             #l=-1,1,2,3,4,5,6,7,31
             l=data['distillationlayer']

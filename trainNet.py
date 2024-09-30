@@ -8,7 +8,7 @@ import time
 from datetime import timedelta,datetime
 import numpy as np
 import torch
-
+import pickle
 from tqdm import tqdm
 from datasets.mvtec import MVTecDataset
 from utils.util import  AverageMeter,readYamlConfig,set_seed,convert_secs2time
@@ -203,9 +203,15 @@ class NetTrainer:
             self.cropping=False
         else:
             if self.cropping:
-                test_path=self.data_path+"/"+self.obj+"/test/not_cropped/"
+                if self.handmade:
+                    test_path=self.data_path+"/"+self.obj+"/testhm/not_cropped/"
+                else:
+                    test_path=self.data_path+"/"+self.obj+"/test/not_cropped/"
             else:
-                test_path=self.data_path+"/"+self.obj+"/test/cropped/"
+                if self.handmade:
+                    test_path=self.data_path+"/"+self.obj+"/testhm/cropped/"
+                else:
+                    test_path=self.data_path+"/"+self.obj+"/test/cropped/"
         
         test_dataset = MVTecDataset(
             root_dir=test_path,
@@ -221,13 +227,14 @@ class NetTrainer:
         progressBar = tqdm(test_loader)
         
         
-        scores = []
+        scores = [] #np.asarray([])
         gt_list = [] #ground truth labels
         #y_true=[]
         hm_dir_basis,csv_path,test_timestamp=generate_result_path(self)
         pred_scores=[]
         minpositive=1
         maxnegative=0
+
         for sample in test_loader:
             
             label=sample['has_anomaly']
@@ -235,63 +242,84 @@ class NetTrainer:
             image = sample['imageBase'].to(self.device)
             gt_list.extend(label.cpu().numpy())
             
-            #if ensamble:
-             #   trafos=[]
-                #for imtransformationage in trafos:
+            pickleuse=False
+            if not pickleuse:
+                with torch.set_grad_enabled(False):
+                    if trainer.cropping:
+                        #print("cropping")
+                        th=0.4 #in % between 0 and 1
+                        area_th=20000
+                        cropped_scores=[]
+                        i=1
+                        for cropped_img in crop_torch_img(image,self.croppingfactor,self.overlapfactor):
+                            #features_s, features_t = infer(self,cropped_img)
+                            aug_scores=augmented_scores(self,cropped_img,str(sample["file_name"]))
+                            #score=cal_anomaly_maps(features_s,features_t,self.img_cropsize,self.norm)
+                            score=np.mean(aug_scores, axis=0)
+                            cropped_scores.append(score)
+                            progressBar.set_postfix({"cropped img": i}) #,"Time/epoch":convert_secs2time(etime)})
+                            #progressBar.update()
+                            i+=1
+                    
 
-
-            #else:
-            with torch.set_grad_enabled(False):
-                if trainer.cropping:
-                    #print("cropping")
-                    th=0.4 #in % between 0 and 1
-                    area_th=20000
-                    cropped_scores=[]
-                    for cropped_img in crop_torch_img(image,self.croppingfactor,self.overlapfactor):
-                        #features_s, features_t = infer(self,cropped_img)
-                        aug_scores=augmented_scores(self,cropped_img)
-                        #score=cal_anomaly_maps(features_s,features_t,self.img_cropsize,self.norm)
+                        score=concat_hm(image,cropped_scores,self.croppingfactor,self.overlapfactor)
+                    else:
+                        th=0.875 #in % between 0 and 1
+                        area_th=100
+                        #print("not cropping")
+                        #features_s, features_t = infer(self,image)  
+                        #score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,self.norm)
+                        aug_scores=augmented_scores(self,image,str(sample["file_name"]))
                         score=np.mean(aug_scores, axis=0)
-                        cropped_scores.append(score)
+                
 
-                    score=concat_hm(image,cropped_scores,self.croppingfactor,self.overlapfactor)
-                else:
-                    th=0.875 #in % between 0 and 1
-                    area_th=100
-                    #print("not cropping")
-                    #features_s, features_t = infer(self,image)  
-                    #score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,self.norm)
-                    aug_scores=augmented_scores(self,image)
-                    score=np.mean(aug_scores, axis=0)
+                pmaxth=0.0003
+                if False:
+                    predscore,hmnumanomalypixel=save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,th,area_th,self.blendfactor,pmaxth)
+                #pred_scores.append(predscore)
+                    predictioncsvarr=[label.cpu().numpy()[0][0],predscore,hmnumanomalypixel,self.param_str,self.obj,str(datetime.now().hour)+"_"+str(datetime.now().minute),self.save_path]
+                    write_in_csv('/home/christianjaspert/masterthesis/DistillationAD/predictions.csv',predictioncsvarr)
 
-            pmaxth=0.0003
-            predscore,hmnumanomalypixel=save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,th,area_th,self.blendfactor,pmaxth)
-            pred_scores.append(predscore)
-            predictioncsvarr=[label.cpu().numpy()[0][0],predscore,hmnumanomalypixel,self.param_str,self.obj,str(datetime.now().hour)+"_"+str(datetime.now().minute),self.save_path]
-            write_in_csv('/home/christianjaspert/masterthesis/DistillationAD/predictions.csv',predictioncsvarr)
-            if label.cpu().numpy()==1:
-                if minpositive>predscore:
-                    minpositive=predscore
-            else:
-                if maxnegative<predscore:
-                    maxnegative=predscore
+                    if label.cpu().numpy()==1:
+                        if minpositive>predscore:
+                            minpositive=predscore
+                    else:
+                        if maxnegative<predscore:
+                            maxnegative=predscore
+                #print(score.shape)
+                #scores=np.append(scores,score)
+
+                scores.append(score)
+                # print(score)
+                # if np.any(np.isnan(score)==True):
+                #     print(score)
+                #     print(sample["file_name"])
 
             progressBar.update() 
-            #print(score.shape)
-            scores.append(score)
-
+            
+            
+        pmaxth=0.0003#####################
         progressBar.close()
-        print(minpositive,maxnegative)
-        #thprediction_array=np.asarray([pred_scores,gt_list[:,0]]) #.transpose(1,0)
-        #write_in_csv("/home/christianjaspert/masterthesis/DistillationAD/thprediction_array.csv",thprediction_array)
         scores = np.asarray(scores)
         gt_list = np.asarray(gt_list)
-        pred_scores=np.array(pred_scores)
+        #pred_scores=np.array(pred_scores)
         groundtruth=np.array(gt_list[:,0])
-        #for i in range(len(pred_scores)):
-            #print(pred_scores[i],groundtruth[i])
+        
 
+        
+        if True:
+            writeread="write"
+            if writeread=="write":
+                with open('scores.pickle', 'wb') as f:
+                    # Pickle the 'data' dictionary using the highest protocol available.
+                    pickle.dump(scores, f, pickle.HIGHEST_PROTOCOL)
+            else: 
+                with open('scores.pickle', 'rb') as f:
+                # Pickle the 'data' dictionary using the highest protocol available.
+                    scores=pickle.load(f)
+                    print(scores)
 
+        print("Done writing pickle")
         img_roc_auc,y_score,optmatrix,th=computeAUROC(self,scores,gt_list,self.obj+("-"+self.myworklabel if self.myworkswitch else "")," "+self.distillType)
         save_log_csv(self,optmatrix,th,test_timestamp,img_roc_auc)
         
@@ -299,12 +327,20 @@ class NetTrainer:
             area_th=20000
         else:
             area_th=100
-        
+        sys.exit()
         s=0  
         for sample in test_loader:
             score=scores[s]
-            save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,th,area_th,self.blendfactor,pmaxth)
-            s+=1
+            predscore,hmnumanomalypixel=save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,th,area_th,self.blendfactor,pmaxth)
+            predictioncsvarr=[label.cpu().numpy()[0][0],predscore,hmnumanomalypixel,self.param_str,self.obj,str(datetime.now().hour)+"_"+str(datetime.now().minute),self.save_path]
+            write_in_csv('/home/christianjaspert/masterthesis/DistillationAD/predictions.csv',predictioncsvarr)
+            # if label.cpu().numpy()==1:
+            #     if minpositive>predscore:
+            #         minpositive=predscore
+            # else:
+            #     if maxnegative<predscore:
+            #         maxnegative=predscore
+            # s+=1
         
         #confusion matrix:
         #              predicted
