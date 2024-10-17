@@ -57,6 +57,7 @@ def cal_anomaly_maps(fs_list, ft_list, out_size,norm):
 def th_img(img,threshold):
     max=np.max(img)
     ret, thresh = cv2.threshold(img, threshold*max, max, cv2.THRESH_BINARY)
+    #ret, thresh = cv2.threshold(img, threshold, max, cv2.THRESH_BINARY)
     return thresh
 
 def write_in_csv(csv_path,line_array):
@@ -301,8 +302,6 @@ def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendin
     
 
 
-
-    
     score_bw=th_img(score,th)
     #score_bw_norm=th_img(normalized_hm,th)
     
@@ -353,7 +352,7 @@ def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendin
     # if not os.path.isdir(contour_hist_dir):
     #         os.mkdir(contour_hist_dir)
     
-    if True:
+    if False:
             # Apply a colormap to the heatmap
         colormap = plt.get_cmap('viridis')
         normalized_hm_colored = colormap(normalized_hm)
@@ -364,22 +363,41 @@ def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendin
         # Overlay the heatmap on the image
         overlay = cv2.addWeighted(normalized_hm_colored8,blendingfactor,img,1-blendingfactor,0)#img_transposetorch2nparr(image.cpu().numpy())*0.7#+heatmap_colored*0.3
         vals = normalized_hm_colored8.mean(axis=2).flatten()
-        s,axarrs=plt.subplots(2,2)
-        #axarrs[0][0].imshow(img)
-        axarrs[0][0].imshow(overlay)
+        cv2.imwrite(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_overlay.png',overlay)
 
-        axarrs[0][1].imshow(normalized_hm)
+        if True:
+            s,axarr=plt.subplots(1,3) #,figsize=(50, 35))
+            
+            axarr[0].imshow(img)
+            axarr[1].imshow(overlay)
+            axarr[1].axis("off")
+            axarr[2].imshow(score_bw)
+            axarr[2].axis("off")
+            #axarr[1][0].contourf(np.flip(normalized_hm,axis=0))
+            #axarr[1][1].imshow(score_bw)
+            plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_thesisplot.png',dpi=500)
+            plt.close()
+        if False:
+            plt.imshow(score_bw)
+            plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_binarizedHM.png',dpi=500)
+            plt.close()
+        if False:
+            s,axarrs=plt.subplots(2,2) #(rows,cols)
+            #axarrs[0][0].imshow(img)
+            axarrs[0][0].imshow(overlay)
 
-        axarrs[1][0].hist(vals, 255)  #.xlim([0,255])
-        axarrs[1][0].set_xlim([0,255])
-        axarrs[1][0].set_ylim([0,500])
-        #plt.savefig(hist_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_Pixelhistogram.png')
-        #print(type(normalized_hm))
-        contourp=axarrs[1][1].contourf(np.flip(normalized_hm,axis=0))
-        s.colorbar(contourp,location="right")
-        #s.set_size_inches(30,20)
-        plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_contourplot.png')
-        plt.close()
+            axarrs[0][1].imshow(normalized_hm)
+
+            axarrs[1][0].hist(vals, 255)  #.xlim([0,255])
+            axarrs[1][0].set_xlim([0,255])
+            axarrs[1][0].set_ylim([0,500])
+            #plt.savefig(hist_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_Pixelhistogram.png')
+            #print(type(normalized_hm))
+            contourp=axarrs[1][1].contourf(np.flip(normalized_hm,axis=0))
+            s.colorbar(contourp,location="right")
+            #s.set_size_inches(30,20)
+            plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_contourplot.png')
+            plt.close()
 
 
 
@@ -396,7 +414,7 @@ def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendin
 
     #cv2.imwrite(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'overlay.png',overlay)
     
-    return num_anomalypixel,hmnum_anomalypixel
+    return
 
 def generate_result_path(trainer):
     test_timestamp=str(datetime.now().hour)+"_"+str(datetime.now().minute)

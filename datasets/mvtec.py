@@ -31,10 +31,10 @@ class MVTecDataset(Dataset):
         self.trainingtransform=T.Compose([
             T.RandomHorizontalFlip(),
             #T.RandomVerticalFlip(),
-            #T.RandomRotation(degrees=180),
-            T.RandomAdjustSharpness(sharpness_factor=.5),
+            T.RandomRotation(degrees=180),
+            #T.RandomAdjustSharpness(sharpness_factor=.5),
             T.RandomAffine(degrees=180),
-            #T.ColorJitter(brightness=.5,contrast=.4)
+            T.ColorJitter(brightness=.5,contrast=.4)
             #T.RandomResize(min_size=10,max_size=100),
             #T.RandomResizedCrop(self.resize_shape)
             ])

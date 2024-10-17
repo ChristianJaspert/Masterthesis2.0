@@ -44,6 +44,8 @@ def getParams(trainer,data,device):
         trainer.augmentation=False
         trainer.save_path = data['save_path']
     trainer.handmade=data["handmade"]
+    trainer.handmadetype=data["handmadetype"]
+    
     trainer.write=data['write']
     trainer.hm_sorting=data['hm_sorting']
     trainer.blendfactor=data['blendfactor']
@@ -57,6 +59,7 @@ def getParams(trainer,data,device):
     trainer.param_str=str(data['obj'])+"_"+str("NOTcropped" if data['cropping'] else "cropped")+"_"+str(data['TrainingData']['epochs'])+"_"+str(data['TrainingData']['batch_size'])+"_"+str(data['TrainingData']['lr'])
     trainer.cropping=data['cropping'] #my own cropping for hd image downsizing
     trainer.croppingfactor=data['croppingfactor']
+    trainer.plotting_hm=data['plotting_hm']
     trainer.overlapfactor=data['overlapfactor']
     trainer.test_img_resize_h = data['TestData']['img_size_h']
     trainer.test_img_resize_w = data['TestData']['img_size_w']
@@ -238,7 +241,7 @@ def computeAUROC(trainer,scores,gt_list,obj,name="base"):
             img_scores_area.append(numanomalpixel)
             csvarray=[numanomalpixel,gt_list[i][0],th*0.02+0.1]
             write_in_csv(csvpath,csvarray)
-        img_scores_area=np.asarray(img_scores_area)/len(img_scores_tmp[0])
+        img_scores_area=np.asarray(img_scores_area)/len(img_scores_tmp[0]) #num pixel of anomaly divided by num pixel of whole image 
         img_roc_auc_area = roc_auc_score(gt_list, img_scores_area)
     print(obj + " image"+str(name)+" AREA ROCAUC: %.3f" % (img_roc_auc_area))
     

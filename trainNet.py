@@ -173,7 +173,7 @@ class NetTrainer:
 
         return losses.avg
 
-    def save_checkpoint(self):
+    def save_checkpoint(self): 
         state = {"model": self.student.state_dict()}
         torch.save(state, os.path.join(self.model_dir, "student.pth"))
         if self.distillType=="rd":
@@ -203,15 +203,32 @@ class NetTrainer:
             self.cropping=False
         else:
             if self.cropping:
-                if self.handmade:
-                    test_path=self.data_path+"/"+self.obj+"/testhm/not_cropped/"
-                else:
-                    test_path=self.data_path+"/"+self.obj+"/test/not_cropped/"
+                cropfolder="not_cropped"
             else:
-                if self.handmade:
-                    test_path=self.data_path+"/"+self.obj+"/testhm/cropped/"
-                else:
-                    test_path=self.data_path+"/"+self.obj+"/test/cropped/"
+                cropfolder="cropped"
+            if self.handmade:
+                testfolder="test_" + self.handmadetype
+            else:
+                testfolder="test"
+            if self.plotting_hm:
+                testfolder=testfolder+"_plots"
+            test_path=self.data_path+"/"+self.obj + "/"+testfolder+"/"+cropfolder+"/"            
+            # if self.cropping:
+            #     if self.handmade:
+            #         if self.handmadetype=="SR":
+            #             test_path=self.data_path+"/"+self.obj+"/test_SR/not_cropped/"
+            #         elif self.handmadetype=="FW":
+            #             test_path=self.data_path+"/"+self.obj+"/test_FW/not_cropped/"
+            #     else:
+            #         test_path=self.data_path+"/"+self.obj+"/test/not_cropped/"
+            # else:
+            #     if self.handmade:
+            #         if self.handmadetype=="SR":
+            #             test_path=self.data_path+"/"+self.obj+"/test_SR/cropped/"
+            #         elif self.handmadetype=="FW":
+            #             test_path=self.data_path+"/"+self.obj+"/test_FW/cropped/"
+            #     else:
+            #         test_path=self.data_path+"/"+self.obj+"/test/cropped/"
         
         test_dataset = MVTecDataset(
             root_dir=test_path,
@@ -307,7 +324,7 @@ class NetTrainer:
         
 
         
-        if True:
+        if False:
             writeread="write"
             if writeread=="write":
                 with open('scores.pickle', 'wb') as f:
@@ -327,20 +344,21 @@ class NetTrainer:
             area_th=20000
         else:
             area_th=100
-        sys.exit()
+        #sys.exit()
         s=0  
         for sample in test_loader:
             score=scores[s]
-            predscore,hmnumanomalypixel=save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,th,area_th,self.blendfactor,pmaxth)
-            predictioncsvarr=[label.cpu().numpy()[0][0],predscore,hmnumanomalypixel,self.param_str,self.obj,str(datetime.now().hour)+"_"+str(datetime.now().minute),self.save_path]
-            write_in_csv('/home/christianjaspert/masterthesis/DistillationAD/predictions.csv',predictioncsvarr)
+            binth=.7
+            save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,binth,area_th,self.blendfactor,pmaxth)
+            #predictioncsvarr=[label.cpu().numpy()[0][0],predscore,self.param_str,self.obj,str(datetime.now().hour)+"_"+str(datetime.now().minute),self.save_path]
+            #write_in_csv('/home/christianjaspert/masterthesis/DistillationAD/predictions.csv',predictioncsvarr)
             # if label.cpu().numpy()==1:
             #     if minpositive>predscore:
             #         minpositive=predscore
             # else:
             #     if maxnegative<predscore:
             #         maxnegative=predscore
-            # s+=1
+            s+=1
         
         #confusion matrix:
         #              predicted

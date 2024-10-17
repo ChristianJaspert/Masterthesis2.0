@@ -62,36 +62,38 @@ class ReverseStudent(nn.Module):
                     #Attention2(512, 512)
                     Attention1(512, 512)
             )
-            if l==2:
+            elif l==2:
                 self.AttBlock = nn.Sequential(
                     #Attention2(512, 512)
                     Attention2(512, 512)
             )
-            if l==3:
+            elif l==3:
                 self.AttBlock = nn.Sequential(
                     #Attention2(512, 512)
                     Attention3(512, 512)
             )
-            if l==4:
+            elif l==4:
                 self.AttBlock = nn.Sequential(
                     #Attention2(512, 512)
                     Attention4(512, 512)
             )
-            if l==5:
+            elif l==5:
                 self.AttBlock = nn.Sequential(
                     #Attention2(512, 512)
                     Attention5(512, 512)
             )
-            if l==6:
+            elif l==6:
                 self.AttBlock = nn.Sequential(
                     #Attention2(512, 512)
                     Attention6(512, 512)
             )
-            if l==7:
+            elif l==7:
                 self.AttBlock = nn.Sequential(
                     #Attention2(512, 512)
                     Attention7(512, 512)
             )
+            else:
+                print("attentionlayer value not valid!")
         else:
             self.AttBlock = nn.Sequential(
                 Attention2(512, 512)
@@ -104,7 +106,7 @@ class ReverseStudent(nn.Module):
         if distillswitch:
             #l=-1,1,2,3,4,5,6,7,31
             l=data['distillationlayer']
-            if l==-1:
+            if l==11:
                 if not self.DG:
                     self.residualLayer0_1 = nn.Sequential(
                         conv3BnRelu(64, 64, stride=1, padding=1),
@@ -247,6 +249,8 @@ class ReverseStudent(nn.Module):
                     nn.AvgPool2d(kernel_size=2, stride=2),
                     Attention(256, 256)
                 )
+            else:
+                print("distillationlayer value not valid!")
         else:
             if not self.DG:
                 self.residualLayer0_1 = nn.Sequential(
