@@ -68,9 +68,15 @@ def write_in_csv(csv_path,line_array):
         #filewriter.writerow(['Derek', 'Software Developer'])
         filewriter.writerow(line_array)
 
-def get_mp_classification(score,pthreshold):
+def get_mp_classification(score,mpthreshold):
+    '''
+    mp means maximum pixel measure
+    returns 1,"anomaly" for anomaly
+    and 0,"good" for good sample
+    '''
     anomaly_score=score.max(axis=1).max()
-    if pthreshold<anomaly_score:
+
+    if mpthreshold<anomaly_score:
         return 1,"anomaly", anomaly_score
     else:
         return 0,"good",anomaly_score
@@ -134,7 +140,7 @@ def img_transposetorch2nparr(torchtensor):
     '''
     return torchtensor[0,:,:,:].transpose(1,2,0)
 
-def concat_hm(torch_img,cropped_scores,croppingfactor,overlapfactor):
+def concat_hm(torch_img,cropped_scores,croppingfactor,overlapfactor,concattype):
     '''
     concatenates heatmaps in following order:
     first column, second column and so on
@@ -172,7 +178,7 @@ def concat_hm(torch_img,cropped_scores,croppingfactor,overlapfactor):
             innerleft=w*(cropwidth-overlapwidth)+overlapwidth
             innerright=(w+1)*(cropwidth-overlapwidth)
             innerbottom=(h+1)*(cropheight-overlapheight)
-            overlaymethod="max"
+            overlaymethod=concattype
             if overlaymethod=="max":
                 score[top:bottom,left:right]=np.maximum(cropped_scores[i],score[top:bottom,left:right])
             elif overlaymethod=="average":
@@ -237,7 +243,6 @@ def concat_hm(torch_img,cropped_scores,croppingfactor,overlapfactor):
                     score[innertop:bottom,innerleft:right]=cropped_scores[i][img_innertop:cropheight,img_innerleft:cropwidth]
             i+=1
     return gaussian_filter(score, sigma=4)
-
 
 def th_method_AUROC(prediction_actual_list):
     '''
@@ -308,51 +313,14 @@ def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendin
     hmprediction,hmpred_str,hmnum_anomalypixel=get_classification(score_bw,area_th)
     prediction,pred_str,num_anomalypixel=get_mp_classification(score,pmaxthreshold)
     actual_str=("anomaly" if label.cpu().numpy()[0][0]==1 else "good")
-    hm_dir=get_hm_dir(hm_dir_basis,hm_sorting,prediction,label.cpu().numpy()[0][0])
+    #print(score.max(axis=1).max(),pmaxthreshold,pred_str)
     csv_arr=[str(th),str(label.cpu().numpy()[0][0]),str(prediction),str((score_bw == 0).sum()),str((score_bw > 0).sum())]
     #threshold bw; actual class; prediction; num zero pixel; num not zero pixel
     write_in_csv(csv_path,csv_arr)
     
-    # #create discrete colormap
-    # cmap = plt.cm.jet  # define the colormap
-    # # extract all colors from the .jet map
-    # cmaplist = [cmap(i) for i in range(cmap.N)]
-    # # force the first color entry to be grey
-    # cmaplist[0] = (.5, .5, .5, 1.0)
-
-    # # create the new map
-    # cmap = mpl.colors.LinearSegmentedColormap.from_list(
-    #     'Custom cmap', cmaplist, cmap.N)
-
-    # f, axarr = plt.subplots(3,2)
-    # axarr[0][0].imshow(img)
-    # im_hm01=axarr[0][1].imshow(overlay)
-    # im_hm10=axarr[1][0].imshow(normalized_hm_colored8)
-    # f.colorbar(im_hm10,location="left")
-    # im_hm20 = axarr[2][0].hist(vals, 255)  #.xlim([0,255])
-    # axarr[2][0].set_xlim([0,255])
-    # im_hm20=axarr[2][0].imshow(score, interpolation='nearest', cmap='viridis',vmin=0.0001,vmax=0.0002)#,vmin=0,vmax=0.0002)
-    # f.colorbar(im_hm20,location="left")
-    # im_hm21=axarr[2][1].imshow(score_bw) #, interpolation='nearest', cmap='viridis',vmin=0.0001,vmax=0.0002)
-    # im_hm21=axarr[2][1].contourf(normalized_hm)
-    # im_hm11=axarr[1][1].imshow(score_bw_norm, interpolation='nearest', cmap='viridis',vmin=0,vmax=1)
-    # plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'.png')
-    # plt.close(f)
-
-
-
     
-    # hist_dir=hm_dir+"pixelhistograms/"
-    # if not os.path.isdir(hist_dir):
-    #         os.mkdir(hist_dir)
-    # contour_dir=hm_dir+"countourplots/"
-    # if not os.path.isdir(contour_dir):
-    #         os.mkdir(contour_dir)
-    # contour_hist_dir=hm_dir+"countourplotswithhistogram/"
-    # if not os.path.isdir(contour_hist_dir):
-    #         os.mkdir(contour_hist_dir)
-    
-    if False:
+    if True:
+        hm_dir=get_hm_dir(hm_dir_basis,hm_sorting,prediction,label.cpu().numpy()[0][0])
             # Apply a colormap to the heatmap
         colormap = plt.get_cmap('viridis')
         normalized_hm_colored = colormap(normalized_hm)
@@ -399,21 +367,6 @@ def save_csv_hm(sample,score,hm_dir_basis,hm_sorting,csv_path,th,area_th,blendin
             plt.savefig(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_contourplot.png')
             plt.close()
 
-
-
-    # plt.hist(vals, 255)  #.xlim([0,255])
-    # plt.xlim([0,255])
-    # plt.ylim([0,1000])
-    # plt.savefig(hist_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_Pixelhistogram.png')
-    # plt.close()
-    
-    # plt.contourf(normalized_hm)
-    # plt.colorbar(location="right")
-    # plt.savefig(contour_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'_contourplot.png')
-    # plt.close()
-
-    #cv2.imwrite(hm_dir+str(sample["file_name"])+"_predicted-"+pred_str+"__actual-"+actual_str+"__numanomalypixel-" +str(num_anomalypixel)+'overlay.png',overlay)
-    
     return
 
 def generate_result_path(trainer):
@@ -492,21 +445,18 @@ def __mean_scores(self, score_list):
 
     return res
 
-def save_log_csv(trainer,confusionmatrix,th,test_timestamp,img_roc_auc):
+def save_log_csv(trainer,test_timestamp,img_roc_auc):
     if not os.path.isdir(trainer.save_path+'/logs/'):
         os.mkdir(trainer.save_path+'/logs/')
     csv_path=trainer.save_path+'/logs/log.csv'
-    tp=str(confusionmatrix[0][0].item())
-    fp=str(confusionmatrix[1][0].item())
-    tn=str(confusionmatrix[1][1].item())
-    fn=str(confusionmatrix[0][1].item())
+
     if trainer.myworkswitch:
         my_work_label=trainer.myworklabel
     else: 
         my_work_label="OG architecture"
     
 
-    log_arr=[trainer.param_str,my_work_label,test_timestamp,(trainer.traintime if trainer.phase=="train" else "test"),img_roc_auc,tp,fp,tn,fn,str(th)]
+    log_arr=[trainer.param_str,my_work_label,test_timestamp,(trainer.traintime if trainer.phase=="train" else "test"),img_roc_auc]
     write_in_csv(csv_path,log_arr)
 
 #                   ((true positive, false negative)

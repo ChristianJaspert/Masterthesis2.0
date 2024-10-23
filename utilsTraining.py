@@ -32,7 +32,7 @@ def getParams(trainer,data,device):
     trainer.num_epochs = data['TrainingData']['epochs']
     trainer.img_resize_h = data['TrainingData']['img_size_h']
     trainer.img_resize_w = data['TrainingData']['img_size_w']
-    trainer.img_cropsize = data['TrainingData']['crop_size'] #for centercrop mvtec
+    trainer.img_cropsize = 256 #data['TrainingData']['crop_size'] #for centercrop mvtec
     trainer.lr = data['TrainingData']['lr']
     trainer.batch_size = data['TrainingData']['batch_size'] 
     trainer.myworkswitch=data['myworkswitch'] 
@@ -43,27 +43,26 @@ def getParams(trainer,data,device):
     else: 
         trainer.augmentation=False
         trainer.save_path = data['save_path']
-    trainer.handmade=data["handmade"]
-    trainer.handmadetype=data["handmadetype"]
-    
+    trainer.handmade=data["g_dataset_use"]
+    trainer.handmadetype=data["g_dataset"]
+    trainer.concattype=data["concatenationtechnique"]
     trainer.write=data['write']
-    trainer.hm_sorting=data['hm_sorting']
-    trainer.blendfactor=data['blendfactor']
+    trainer.hm_sorting=data['scoremap_sorting']
+    trainer.blendfactor=0.4 #data['blendfactor']
     trainer.model_dir = trainer.save_path+ "/models" + "/" + trainer.obj  
     trainer.img_dir = trainer.save_path+ "/imgs" + "/" + trainer.obj 
     trainer.modelName = data['backbone']
     trainer.outIndices = data['out_indice']
     trainer.distillType=data['distillType']
     trainer.norm = data['TrainingData']['norm']
-    trainer.threshold=data['threshold']
-    trainer.param_str=str(data['obj'])+"_"+str("NOTcropped" if data['cropping'] else "cropped")+"_"+str(data['TrainingData']['epochs'])+"_"+str(data['TrainingData']['batch_size'])+"_"+str(data['TrainingData']['lr'])
-    trainer.cropping=data['cropping'] #my own cropping for hd image downsizing
-    trainer.croppingfactor=data['croppingfactor']
-    trainer.plotting_hm=data['plotting_hm']
+    trainer.threshold=data['classification_threshold']
+    trainer.param_str=str(data['obj'])+"_"+str("NOTcropped" if data['use_fullsize_samples'] else "cropped")+"_"+str(data['TrainingData']['epochs'])+"_"+str(data['TrainingData']['batch_size'])+"_"+str(data['TrainingData']['lr'])
+    trainer.cropping=data['use_fullsize_samples'] #my own cropping for hd image downsizing
+    trainer.croppingfactor=4 #data['croppingfactor']
     trainer.overlapfactor=data['overlapfactor']
     trainer.test_img_resize_h = data['TestData']['img_size_h']
     trainer.test_img_resize_w = data['TestData']['img_size_w']
-    trainer.test_img_cropsize = data['TestData']['crop_size']
+    #trainer.test_img_cropsize = data['TestData']['crop_size']
     trainer.rot_90=data['AugmentScores']['rot_90']
     trainer.rot_180=data['AugmentScores']['rot_180']
     trainer.rot_270=data['AugmentScores']['rot_270']
@@ -254,20 +253,9 @@ def computeAUROC(trainer,scores,gt_list,obj,name="base"):
         writer.add_pr_curve("Precision Recall Curve "+obj,np.array(gt_list[:,0]),np.array(img_scores),None,100)
         writer.add_figure("ROC curve "+obj,roc_curve)
 
-    for i in range(10):
-        metric=BinaryConfusionMatrix(threshold=0.1*i)
-        metric.update(torch.tensor(img_scores),torch.tensor(gt_list[:,0]))
-        if i==0:
-            optmatrix=metric.compute()
-            optth=i
-        else:
-            if optmatrix[0][0]+optmatrix[1][1]<metric.compute()[0][0]+metric.compute()[1][1]:
-                optmatrix=metric.compute()
-                optth=i
-        #print(metric.compute())
-    print("Optimal Matrix for th %.3f:" %(optth))
-    print(optmatrix)
-    return img_roc_auc,img_scores,optmatrix,optth
+
+
+    return img_roc_auc,img_scores
 
 def cal_importance(ft, fs,norm):
 

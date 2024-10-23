@@ -1,18 +1,16 @@
+
 data_path: "/home/christianjaspert/masterthesis/DistillationAD/datasets/MVTEC"
 distillType: dbfad #st #st #dbfad # rd,ead, st
 backbone: resnet18 # any cnn model for, any resnet or wide resnet for rd, medium or small for ead
 out_indice: [2,3] # for st
-
+write: False #used as switch on and off for tensorboard 
 
 save_path: "./results"
 save_path_modified_architecture: "./results_modified_architecture"
-hm_sorting: True #hm: heatmap
-blendfactor: 0.4
+scoremap_sorting: True #hm: heatmap
 
-croppingfactor: 4
-threshold: 0.0001
+
 TrainingData:
-  
   epochs: 50 #100
   batch_size: 4 #4
   lr: 0.0005 #0.0005
@@ -28,68 +26,50 @@ TestData:
 debugparams: False
 
 
+
+#controll things of the masterthesis here:
+myworkswitch: True #set to False for original architecture
+phase: test #type test or train wheather you want to do the training process or just the testing
+obj: myfabric_dataset #carpet
 augmentation: True #True original code: False  -  This switches the training data augmentation on(True) and off (False) 
+distillationswitch: True #switch on and off the changes on the distillation connections. False uses original structure
+attentionswitch: True #switch on and off the changes on the bottleneck. False uses original structure
+myworklabel: myFabricCombinedUncropped
+#this label is used to generate folderstructure where the trained model and the outcomes are saved
+#To reuse a model you have to type in the old label/foldername used that time
+#also remember to set attentionlayer and distillationlayer to the values used for that model 
+#otherwise you wil get a mismatch error
 
 
-
-#obj: myfabric_hm_anomalie
-obj: myfabric_dataset #w625 h337 not cropped test: w2500 h1350#
-#obj: carpet
-#obj: fabric2cropped_png #w1250 h675
-
-myworkswitch: True #set to False for original code
-distillationswitch: True
-attentionswitch: True
-write: False
-
-myworklabel: augmentationAffine #DistillationLayer2 #myFabricCombinedUncropped #"xMVTEC_combined"
-#myworklabel: xMVTEC_combined
-attentionlayer: 2 #1,2,3,4,5,6,7 original code: 2
-distillationlayer: 31 #11,1,2,3,4,5,6,7,31 original code: 31; -1 and 31 use 1x1 convolutions, the rest 3x3 convolutions
+#approaches architecture
+attentionlayer: 4 #1,2,3,4,5,6,7 original code: 2
+distillationlayer: 5 #11,1,2,3,4,5,6,7,31 #original code: 31; -1 and 31 use 1x1 convolutions, the rest 3x3 convolutions
 #myFabricCombined uses attentionLayer=1 and distillationlayer=31
 #myFabricCombinedUncropped uses attentionLayer=4 and distillationlayer=5
-handmade: False #False
-plotting_hm: True #True: uses tiny dataset folder for rendered heatmap plots
-handmadetype: FW #SR #FW
-cropping: False #False: uses the cropped tiny pictures in the test phase, True: uses the big pictures and crops them
-overlapfactor: 0 #0.40234375
-phase: test
-
-#uncropped
-#FW max 0,4 f&r
-#SR 0overlap just f
-#Innowep max 0,4 r
-
-#cropped
-#FW f&r
-#SR f
-#Innowep f&r
-
-# #testaugmentation: "none" #"rotation",
-# AugmentScores:
-#   rot_90: True
-#   rot_180: True
-#   rot_270: True
-#   h_flip: True
-#   h_flip_rot_90: True
-#   h_flip_rot_180: True
-#   h_flip_rot_270: True
+#these two parameters say how many layers are used in the distillation and attention bottle neck structure.
+#the have to fit the values used for the training of a model in case of reusing it only for testing
 
 
-# AugmentScores:
-#   rot_90: True
-#   rot_180: True
-#   rot_270: True
-#   h_flip: False
-#   h_flip_rot_90: False
-#   h_flip_rot_180: False
-#   h_flip_rot_270: False
+#approaches outside of architecture
+use_fullsize_samples: False #False: uses the cropped tiny pictures in the test phase, True: uses the big pictures and crops them
+overlapfactor: 0.49
+concatenationtechnique: "average" #"average"
+#for overlapfactor you can type any number between 0 and 0.5
+#for the thesis 0 and 0.25 and 0.40234375 were used, explanation see thesis
 
+
+#generalization dataset
+g_dataset_use: False #if myfabric_dataset is used this switches on and of the use of the globalization dataset for testing
+g_dataset: FW #type FW for Glob1FW and SR for Glob2SR globalization dataset
+
+#method of hendrik switch on and of the augmentations of the testsample for ensembled score map
 AugmentScores:
   rot_90: False
   rot_180: False
   rot_270: False
-  h_flip: False
+  h_flip: True
   h_flip_rot_90: False
   h_flip_rot_180: False
   h_flip_rot_270: False
+
+classification_threshold: 0.0003

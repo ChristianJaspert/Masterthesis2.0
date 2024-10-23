@@ -198,10 +198,10 @@ class NetTrainer:
 
         
         kwargs = ({"num_workers": 1, "pin_memory": True} if torch.cuda.is_available() else {} )
-        if self.obj=="carpet":
+        if self.obj=="myfabric_dataset":
             test_path=self.data_path+"/"+self.obj+"/test/"
-            self.cropping=False
-        else:
+            #self.cropping=True
+        
             if self.cropping:
                 cropfolder="not_cropped"
             else:
@@ -210,26 +210,11 @@ class NetTrainer:
                 testfolder="test_" + self.handmadetype
             else:
                 testfolder="test"
-            if self.plotting_hm:
-                testfolder=testfolder+"_plots"
-            test_path=self.data_path+"/"+self.obj + "/"+testfolder+"/"+cropfolder+"/"            
-            # if self.cropping:
-            #     if self.handmade:
-            #         if self.handmadetype=="SR":
-            #             test_path=self.data_path+"/"+self.obj+"/test_SR/not_cropped/"
-            #         elif self.handmadetype=="FW":
-            #             test_path=self.data_path+"/"+self.obj+"/test_FW/not_cropped/"
-            #     else:
-            #         test_path=self.data_path+"/"+self.obj+"/test/not_cropped/"
-            # else:
-            #     if self.handmade:
-            #         if self.handmadetype=="SR":
-            #             test_path=self.data_path+"/"+self.obj+"/test_SR/cropped/"
-            #         elif self.handmadetype=="FW":
-            #             test_path=self.data_path+"/"+self.obj+"/test_FW/cropped/"
-            #     else:
-            #         test_path=self.data_path+"/"+self.obj+"/test/cropped/"
-        
+
+            test_path=self.data_path+"/"+self.obj + "/"+testfolder+"/"+cropfolder+"/"   
+        else: 
+            test_path=self.data_path+"/"+self.obj+"/test/"
+            self.cropping=False        
         test_dataset = MVTecDataset(
             root_dir=test_path,
             resize_shape=[self.img_resize_h,self.img_resize_w],
@@ -248,9 +233,7 @@ class NetTrainer:
         gt_list = [] #ground truth labels
         #y_true=[]
         hm_dir_basis,csv_path,test_timestamp=generate_result_path(self)
-        pred_scores=[]
-        minpositive=1
-        maxnegative=0
+        
 
         for sample in test_loader:
             
@@ -263,8 +246,6 @@ class NetTrainer:
             if not pickleuse:
                 with torch.set_grad_enabled(False):
                     if trainer.cropping:
-                        #print("cropping")
-                        th=0.4 #in % between 0 and 1
                         area_th=20000
                         cropped_scores=[]
                         i=1
@@ -277,87 +258,39 @@ class NetTrainer:
                             progressBar.set_postfix({"cropped img": i}) #,"Time/epoch":convert_secs2time(etime)})
                             #progressBar.update()
                             i+=1
-                    
-
-                        score=concat_hm(image,cropped_scores,self.croppingfactor,self.overlapfactor)
+                        score=concat_hm(image,cropped_scores,self.croppingfactor,self.overlapfactor,self.concattype)
                     else:
-                        th=0.875 #in % between 0 and 1
                         area_th=100
                         #print("not cropping")
                         #features_s, features_t = infer(self,image)  
                         #score =cal_anomaly_maps(features_s,features_t,self.img_cropsize,self.norm)
                         aug_scores=augmented_scores(self,image,str(sample["file_name"]))
                         score=np.mean(aug_scores, axis=0)
-                
-
-                pmaxth=0.0003
-                if False:
-                    predscore,hmnumanomalypixel=save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,th,area_th,self.blendfactor,pmaxth)
-                #pred_scores.append(predscore)
-                    predictioncsvarr=[label.cpu().numpy()[0][0],predscore,hmnumanomalypixel,self.param_str,self.obj,str(datetime.now().hour)+"_"+str(datetime.now().minute),self.save_path]
-                    write_in_csv('/home/christianjaspert/masterthesis/DistillationAD/predictions.csv',predictioncsvarr)
-
-                    if label.cpu().numpy()==1:
-                        if minpositive>predscore:
-                            minpositive=predscore
-                    else:
-                        if maxnegative<predscore:
-                            maxnegative=predscore
-                #print(score.shape)
-                #scores=np.append(scores,score)
-
                 scores.append(score)
-                # print(score)
-                # if np.any(np.isnan(score)==True):
-                #     print(score)
-                #     print(sample["file_name"])
-
             progressBar.update() 
             
             
-        pmaxth=0.0003#####################
+        #pmaxth=self#threshold for maximum pixel measure for classification
         progressBar.close()
         scores = np.asarray(scores)
         gt_list = np.asarray(gt_list)
-        #pred_scores=np.array(pred_scores)
-        groundtruth=np.array(gt_list[:,0])
         
 
-        
-        if False:
-            writeread="write"
-            if writeread=="write":
-                with open('scores.pickle', 'wb') as f:
-                    # Pickle the 'data' dictionary using the highest protocol available.
-                    pickle.dump(scores, f, pickle.HIGHEST_PROTOCOL)
-            else: 
-                with open('scores.pickle', 'rb') as f:
-                # Pickle the 'data' dictionary using the highest protocol available.
-                    scores=pickle.load(f)
-                    print(scores)
 
         print("Done writing pickle")
-        img_roc_auc,y_score,optmatrix,th=computeAUROC(self,scores,gt_list,self.obj+("-"+self.myworklabel if self.myworkswitch else "")," "+self.distillType)
-        save_log_csv(self,optmatrix,th,test_timestamp,img_roc_auc)
+        img_roc_auc,y_score=computeAUROC(self,scores,gt_list,self.obj+("-"+self.myworklabel if self.myworkswitch else "")," "+self.distillType)
+        save_log_csv(self,test_timestamp,img_roc_auc)
         
         if trainer.cropping:
             area_th=20000
         else:
             area_th=100
-        #sys.exit()
         s=0  
         for sample in test_loader:
             score=scores[s]
             binth=.7
-            save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,binth,area_th,self.blendfactor,pmaxth)
-            #predictioncsvarr=[label.cpu().numpy()[0][0],predscore,self.param_str,self.obj,str(datetime.now().hour)+"_"+str(datetime.now().minute),self.save_path]
-            #write_in_csv('/home/christianjaspert/masterthesis/DistillationAD/predictions.csv',predictioncsvarr)
-            # if label.cpu().numpy()==1:
-            #     if minpositive>predscore:
-            #         minpositive=predscore
-            # else:
-            #     if maxnegative<predscore:
-            #         maxnegative=predscore
+            save_csv_hm(sample,score,hm_dir_basis,self.hm_sorting,csv_path,binth,area_th,self.blendfactor,self.threshold)
+
             s+=1
         
         #confusion matrix:
